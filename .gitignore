@@ -1,0 +1,7 @@
+# user-supplied and downloaded installers live in vendor/ but are never committed
+vendor/*.exe
+vendor/*.EXE
+vendor/*.msi
+*.log
+.DS_Store
+vendor/*.part

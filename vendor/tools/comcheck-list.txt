@@ -1,0 +1,128 @@
+# COM classes Platypus creates at runtime (from its own code) and the controls it hosts.
+# Run by install.sh/install-macos.sh at the end ("self-check"); anything not OK/LICENSED
+# is a broken install. LICENSED = licensed ActiveX control whose factory loaded (normal).
+# --- Platypus' own COM library (version-independent names, as the app uses them) ---
+Platypus.COM.TCPSocket
+Platypus.COM.UDPSocket
+Platypus.COM.DNS
+Platypus.COM.Ping
+Platypus.COM.curl
+Platypus.COM.json
+Platypus.COM.hash
+Platypus.COM.hmac
+Platypus.COM.base64
+Platypus.COM.bcrypt
+Platypus.COM.blowfish
+Platypus.COM.gzip
+Platypus.COM.mikrotik
+Platypus.COM.tuapp
+Platypus.COM.cryptography.aes
+Platypus.COM.cryptography.rc4
+tu_app.appConnector
+# --- data / logging ---
+ADODB.Stream
+ADODB.Connection
+ADODB.Recordset
+# --- XML / HTTP ---
+MSXML2.DOMDocument
+MSXML2.DOMDocument.3.0
+MSXML2.DOMDocument.4.0
+MSXML2.DOMDocument.6.0
+Microsoft.XMLDOM
+Microsoft.XMLHTTP
+Msxml2.XMLHTTP.3.0
+Msxml2.XMLHTTP.6.0
+Msxml2.XMLHTTP
+Msxml2.ServerXMLHTTP
+WinHttp.WinHttpRequest.5.1
+# --- scripting / shell / WMI ---
+Scripting.FileSystemObject
+Scripting.Dictionary
+WScript.Shell
+Shell.Application
+WbemScripting.SWbemLocator
+VBScript.RegExp
+# --- e-mail ---
+MailBee.SMTP
+MailBee.POP3
+MailBee.IMAP4
+MailBee.Message
+Chilkat_9_5_0.MailMan
+Chilkat_9_5_0.Email
+Chilkat_9_5_0.Imap
+Chilkat_9_5_0.Http
+Chilkat_9_5_0.Socket
+Chilkat_9_5_0.Crypt2
+Chilkat_9_5_0.Zip
+# --- reports (Crystal Reports XI runtime) ---
+CrystalRuntime.Application
+CrystalRuntime.Report
+CrystalReports115.CrystalReportViewer.1
+CrystalReports115.SelectExpert.1
+# --- ActiveX controls hosted on forms (licensed: factory must load) ---
+MSComctlLib.ListViewCtrl.2
+MSComctlLib.TreeCtrl.2
+MSComctlLib.ImageListCtrl.2
+MSComctlLib.Toolbar.2
+MSComctlLib.TabStrip.2
+MSComCtl2.DTPicker.2
+MSComCtl2.MonthView.2
+MSComDlg.CommonDialog.1
+MSFlexGridLib.MSFlexGrid.1
+ctALARM.ctAlarmCtrl.2
+ChadoSpellText.SpellText
+IEPostWrapper.WebBrowser
+XceedSoftware.XceedZip.4
+# --- the same hosted controls by CLSID (FoxPro forms embed CLSIDs, not ProgIDs; some
+#     controls, e.g. the ct* calendar set, register no ProgID at all) ---
+{E22CCE14-B7AC-11D1-A1C2-444553540000}   # ChadoSpellText.ocx: ChadoSpellText.SpellText
+{FCC8D1C1-2B21-11D2-A1C2-8EE2478EFE79}   # ChadoSpellText.ocx: ChadoSpellText.Spelling
+{DC1C5A9C-E88A-4DDE-A5A1-60F82A20AEF7}   # comdlg32.dll: File Open Dialog
+{C0B4E2F3-BA21-4773-8DBA-335EC946EB8B}   # comdlg32.dll: File Save Dialog
+{8F0F480A-4366-4737-8265-2AD6FDAC8C31}   # comdlg32.ocx: Microsoft Common Dialog Control, version 6.0 (SP6)
+{F9043C85-F6F2-101A-A3C9-08002B2F49FB}   # comdlg32.ocx: Microsoft Common Dialog Control, version 6.0 (SP6)
+{6A3CAC25-7687-11D3-9441-50AC0EC10000}   # ctAlarm.ocx: ctAlarm Control 2.0
+{CD325905-EC3F-11D3-945A-E4E10EC10000}   # ctDate.ocx: ctDate Control 4.0
+{89F9F445-6D05-11D3-9441-50AC0EC10000}   # ctDays.ocx: ctDays Control 3.0
+{6B787745-7A47-11D3-9441-50AC0EC10000}   # ctMonth.ocx: ctMonth Control 5.0
+{5AFFD1E6-F18F-4D2A-AA85-ED7B9B7FDF11}   # IEPostWrapper.ocx: IEPostWrapper.WebBrowser
+{1906F94F-8256-480A-8CDF-60821592CB4B}   # mscomct2.ocx: Microsoft Animation Control 6.0 (SP6)
+{3D8152C1-0CFD-4968-9684-794046886E31}   # mscomct2.ocx: Microsoft Animation Control 6.0 (SP6)
+{B09DE715-87C1-11D1-8BE3-0000F8754DA1}   # mscomct2.ocx: Microsoft Animation Control 6.0 (SP6)
+{20DD1B9E-87C4-11D1-8BE3-0000F8754DA1}   # mscomct2.ocx: Microsoft Date and Time Picker Control 6.0 (SP6)
+{4D588145-A84B-4100-85D7-FD2EA1D19831}   # mscomct2.ocx: Microsoft Date and Time Picker Control 6.0 (SP6)
+{CFA7636D-CAA1-4F18-868F-8720624C8B86}   # mscomct2.ocx: Microsoft Flat Scrollbar Control 6.0 (SP6)
+{FE38753A-44A3-11D1-B5B7-0000C09000C4}   # mscomct2.ocx: Microsoft Flat Scrollbar Control 6.0 (SP6)
+{232E456A-87C3-11D1-8BE3-0000F8754DA1}   # mscomct2.ocx: Microsoft MonthView Control 6.0 (SP6)
+{F1651457-356D-4CA2-989D-701606A4C828}   # mscomct2.ocx: Microsoft MonthView Control 6.0 (SP6)
+{603C7E80-87C2-11D1-8BE3-0000F8754DA1}   # mscomct2.ocx: Microsoft UpDown Control 6.0 (SP6)
+{CEDFFAFD-3C2F-4552-9FD3-3DC4299057FD}   # mscomct2.ocx: Microsoft UpDown Control 6.0 (SP6)
+{87DACC48-F1C5-4AF3-84BA-A2A72C2AB959}   # mscomctl.ocx: Microsoft ImageComboBox Control 6.0 (SP6)
+{DD9DA666-8594-11D1-B16A-00C0F0283628}   # mscomctl.ocx: Microsoft ImageComboBox Control 6.0 (SP6)
+{2C247F23-8591-11D1-B16A-00C0F0283628}   # mscomctl.ocx: Microsoft ImageList Control 6.0 (SP6)
+{556C2772-F1AD-4DE1-8456-BD6E8F66113B}   # mscomctl.ocx: Microsoft ImageList Control 6.0 (SP6)
+{F91CAF91-225B-43A7-BB9E-472F991FC402}   # mscomctl.ocx: Microsoft ImageList Control 6.0 (SP6)
+{979127D3-7D01-4FDE-AF65-A698091468AF}   # mscomctl.ocx: Microsoft ListView Control 6.0 (SP6)
+{996BF5E0-8044-4650-ADEB-0B013914E99C}   # mscomctl.ocx: Microsoft ListView Control 6.0 (SP6)
+{BDD1F04B-858B-11D1-B16A-00C0F0283628}   # mscomctl.ocx: Microsoft ListView Control 6.0 (SP6)
+{CCDB0DF2-FD1A-4856-80BC-32929D8359B7}   # mscomctl.ocx: Microsoft ListView Control 6.0 (SP6)
+{35053A22-8589-11D1-B16A-00C0F0283628}   # mscomctl.ocx: Microsoft ProgressBar Control 6.0 (SP6)
+{A0E7BF67-8D30-4620-8825-7111714C7CAB}   # mscomctl.ocx: Microsoft ProgressBar Control 6.0 (SP6)
+{0B314611-2C19-4AB4-8513-A6EEA569D3C4}   # mscomctl.ocx: Microsoft Slider Control 6.0 (SP6)
+{F08DF954-8592-11D1-B16A-00C0F0283628}   # mscomctl.ocx: Microsoft Slider Control 6.0 (SP6)
+{585AA280-ED8B-46B2-93AE-132ECFA1DAFC}   # mscomctl.ocx: Microsoft StatusBar Control 6.0 (SP6)
+{627C8B79-918A-4C5C-9E19-20F66BF30B86}   # mscomctl.ocx: Microsoft StatusBar Control 6.0 (SP6)
+{8E3867A3-8586-11D1-B16A-00C0F0283628}   # mscomctl.ocx: Microsoft StatusBar Control 6.0 (SP6)
+{1EFB6596-857C-11D1-B16A-00C0F0283628}   # mscomctl.ocx: Microsoft TabStrip Control 6.0 (SP6)
+{24B224E0-9545-4A2F-ABD5-86AA8A849385}   # mscomctl.ocx: Microsoft TabStrip Control 6.0 (SP6)
+{9A948063-66C3-4F63-AB46-582EDAA35047}   # mscomctl.ocx: Microsoft TabStrip Control 6.0 (SP6)
+{66833FE6-8583-11D1-B16A-00C0F0283628}   # mscomctl.ocx: Microsoft Toolbar Control 6.0 (SP6)
+{7DC6F291-BF55-4E50-B619-EF672D9DCC58}   # mscomctl.ocx: Microsoft Toolbar Control 6.0 (SP6)
+{8B2ADD10-33B7-4506-9569-0A1E1DBBEBAE}   # mscomctl.ocx: Microsoft Toolbar Control 6.0 (SP6)
+{9181DC5F-E07D-418A-ACA6-8EEA1ECB8E9E}   # mscomctl.ocx: Microsoft TreeView Control 6.0 (SP6)
+{95F0B3BE-E8AC-4995-9DCA-419849E06410}   # mscomctl.ocx: Microsoft TreeView Control 6.0 (SP6)
+{C74190B6-8589-11D1-B16A-00C0F0283628}   # mscomctl.ocx: Microsoft TreeView Control 6.0 (SP6)
+{6262D3A0-531B-11CF-91F6-C2863C385E30}   # msflxgrd.ocx: Microsoft FlexGrid Control, version 6.0 (SP6)
+{74DD2713-BA98-4D10-A16E-270BBEB9B555}   # msflxgrd.ocx: Microsoft FlexGrid Control, version 6.0 (SP6)
+{4C836512-BB70-11D2-A5A7-00105A9C91C6}   # XceedZip.dll: Xceed Compression Control
+{DB797690-40E0-11D2-9BD5-0060082AE372}   # XceedZip.dll: Xceed Zip Control v4.1

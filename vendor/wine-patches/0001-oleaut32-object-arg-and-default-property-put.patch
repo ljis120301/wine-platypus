@@ -1,0 +1,81 @@
+--- a/dlls/oleaut32/typelib.c
++++ b/dlls/oleaut32/typelib.c
+@@ -7338,6 +7338,15 @@
+                             V_BYREF(&rgvarg[i]) = V_BYREF(src_arg);
+                             V_VT(&rgvarg[i]) = rgvt[i];
+                         }
++                        else if ((V_VT(src_arg) == VT_NULL || V_VT(src_arg) == VT_EMPTY) &&
++                                 (rgvt[i] == VT_DISPATCH || rgvt[i] == VT_UNKNOWN))
++                        {
++                            /* Null/Empty passed for an object parameter means "no object"
++                             * (e.g. VFP: oListView.SelectedItem = .NULL.); native accepts it. */
++                            V_VT(&rgvarg[i]) = rgvt[i];
++                            V_DISPATCH(&rgvarg[i]) = NULL;
++                            hres = S_OK;
++                        }
+                         else
+                         {
+                             /* FIXME: this doesn't work for VT_BYREF arguments if
+@@ -7639,7 +7648,62 @@
+                 }
+ 
+                 if (count_inputs == 0 || pDispParams->cArgs == count_inputs + 1)
++                {
++                    /* obj.Item(index) = value : the member is a get-only property
++                     * (optionally indexed) that returns an object.  Native oleaut32
++                     * writes the value through to the default (DISPID_VALUE) property
++                     * of the returned object; e.g. VB/VFP "Set-less" assignment such
++                     * as ListView ListSubItems(n) = text.  Fetch the object with the
++                     * index arguments, then put the value into its default member. */
++                    UINT nnamed = pDispParams->cNamedArgs;
++                    VARIANT obj;
++                    DISPPARAMS get_params;
++                    HRESULT chain;
++
++                    VariantInit(&obj);
++                    get_params.rgvarg = pDispParams->rgvarg + nnamed;
++                    get_params.rgdispidNamedArgs = NULL;
++                    get_params.cArgs = pDispParams->cArgs - nnamed;
++                    get_params.cNamedArgs = 0;
++                    chain = ITypeInfo_fnInvoke(iface, pIUnk, memid, INVOKE_PROPERTYGET,
++                                               &get_params, &obj, pExcepInfo, pArgErr);
++                    if (SUCCEEDED(chain) &&
++                        (V_VT(&obj) == VT_DISPATCH || V_VT(&obj) == VT_UNKNOWN) &&
++                        V_DISPATCH(&obj))
++                    {
++                        IDispatch *disp = NULL;
++                        if (V_VT(&obj) == VT_DISPATCH)
++                        {
++                            disp = V_DISPATCH(&obj);
++                            IDispatch_AddRef(disp);
++                        }
++                        else
++                            IUnknown_QueryInterface(V_UNKNOWN(&obj), &IID_IDispatch,
++                                                    (void **)&disp);
++                        if (disp)
++                        {
++                            DISPID putid = DISPID_PROPERTYPUT;
++                            VARIANTARG val = pDispParams->rgvarg[0];
++                            DISPPARAMS put_params = { &val, &putid, 1, 1 };
++                            UINT k;
++
++                            for (k = 0; k < pDispParams->cNamedArgs; k++)
++                                if (pDispParams->rgdispidNamedArgs[k] == DISPID_PROPERTYPUT)
++                                {
++                                    val = pDispParams->rgvarg[k];
++                                    break;
++                                }
++                            chain = IDispatch_Invoke(disp, DISPID_VALUE, &IID_NULL,
++                                                     GetSystemDefaultLCID(), wFlags,
++                                                     &put_params, NULL, pExcepInfo, pArgErr);
++                            IDispatch_Release(disp);
++                            VariantClear(&obj);
++                            return chain;
++                        }
++                    }
++                    VariantClear(&obj);
+                     return DISP_E_BADPARAMCOUNT;
++                }
+             }
+         }
+     }

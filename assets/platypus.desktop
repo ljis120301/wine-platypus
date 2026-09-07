@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Platypus Billing
+GenericName=ISP Billing
+Comment=Tucows Platypus Billing System (Client) running under Wine
+Exec=@EXEC@
+Icon=platypus-billing
+Terminal=false
+Categories=Office;Finance;
+Keywords=Platypus;Billing;Tucows;ISP;Wine;
+StartupNotify=true
+StartupWMClass=plat.exe
