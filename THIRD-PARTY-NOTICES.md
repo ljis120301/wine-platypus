@@ -1,7 +1,8 @@
 # Third-party components
 
-The scripts and tools in this repository are MIT licensed (see `LICENSE`). They install
-and rely on software from other parties, which keeps its own licence:
+The scripts and tools in this repository are licensed under the GNU General Public License,
+version 3 or (at your option) any later version (see `LICENSE`). They install and rely on
+software from other parties, which keeps its own licence:
 
 * **Platypus Billing System (Client)** is a product of Tucows Inc. It is **not** included
   here. You need your own licensed installer (`Platypus7.Client.exe`) from Tucows; the

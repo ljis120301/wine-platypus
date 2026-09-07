@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* fixprogids: for every HKCR ProgID that has CurVer but no CLSID value, resolve
  * CurVer -> versioned ProgID -> CLSID and write it under the version-independent ProgID.
  * Windows' CLSIDFromProgID follows CurVer; Wine's does not, so apps using the

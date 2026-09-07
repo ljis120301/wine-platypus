@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # ---------------------------------------------------------------------------
 # wine-platypus :: Linux installer (Ubuntu / Debian / Linux Mint / Pop!_OS / Fedora)
 #

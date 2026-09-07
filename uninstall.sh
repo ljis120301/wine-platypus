@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # wine-platypus :: remove everything the installer created (Linux + macOS).
 # Wine itself (the distro/Homebrew package) is left alone.
 set -euo pipefail

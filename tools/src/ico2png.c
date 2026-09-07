@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* ico2png: write the largest PNG-encoded image inside a .ico to a .png file
  * (modern icons store their 256x256 image as PNG). usage: ico2png in.ico out.png */
 #include <windows.h>

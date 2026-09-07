@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
 # ---------------------------------------------------------------------------
 # wine-platypus :: macOS installer (Apple Silicon and Intel, macOS 12+)
 #

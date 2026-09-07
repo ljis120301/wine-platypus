@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Exercise MSXML the way Platypus' framework does (late-bound IDispatch):
  * DOMDocument: loadXML, documentElement, createElement, appendChild, createTextNode,
  * selectNodes(...).length/item, selectSingleNode, .text, .xml ; plus XMLHTTP creation. */

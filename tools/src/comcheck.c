@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* comcheck: instantiate COM ProgIDs, each in its own child process, with a timeout.
  *   comcheck.exe list.txt [report.txt]    -> one line per ProgID: OK / LICENSED / NOTREG / FAIL / CRASH / TIMEOUT
  *   comcheck.exe --one ProgID             -> (internal) exit code encodes the result */

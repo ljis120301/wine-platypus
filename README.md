@@ -156,7 +156,9 @@ tools/src/           sources of the helper tools (MinGW-w64)
 docs/                how it works, rebuilding the patch, upstream notes, screenshots
 ```
 
-MIT licensed; see `THIRD-PARTY-NOTICES.md` for Tucows, Wine and Microsoft components.
+Licensed under the GNU GPL v3 or later (`LICENSE`); see `THIRD-PARTY-NOTICES.md` for the
+Tucows, Wine and Microsoft components it installs, none of which are part of this repository
+except the rebuilt Wine `oleaut32.dll` (LGPL).
 
 ## 10. Also known as / if you searched for
 
