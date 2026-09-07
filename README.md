@@ -12,8 +12,8 @@ the provisioning replies, VB6/MFC42‑based ActiveX controls, two `oleaut32` COM
 half‑registered COM classes.
 
 ```
-Linux  : git clone --depth 1 https://github.com/GITHUB_USER/wine-platypus && cd wine-platypus && ./install.sh
-macOS  : git clone --depth 1 https://github.com/GITHUB_USER/wine-platypus && cd wine-platypus && ./install-macos.sh
+Linux  : git clone --depth 1 https://github.com/<your-github-username>/wine-platypus && cd wine-platypus && ./install.sh
+macOS  : git clone --depth 1 https://github.com/<your-github-username>/wine-platypus && cd wine-platypus && ./install-macos.sh
 ```
 
 Tested with Wine 11.0 against a production SQL Server (TDS 7.4), in 32‑bit and 64‑bit
@@ -42,7 +42,7 @@ Tested with Wine 11.0 against a production SQL Server (TDS 7.4), in 32‑bit and
 ## 2. Install on Linux
 
 ```bash
-git clone --depth 1 https://github.com/GITHUB_USER/wine-platypus
+git clone --depth 1 https://github.com/<your-github-username>/wine-platypus
 cd wine-platypus
 cp /path/to/Platypus7.Client.exe vendor/
 ./install.sh
@@ -68,7 +68,7 @@ remember both, so `./install.sh --yes` alone is enough to repair an existing ins
 ## 3. Install on macOS
 
 ```bash
-git clone --depth 1 https://github.com/GITHUB_USER/wine-platypus
+git clone --depth 1 https://github.com/<your-github-username>/wine-platypus
 cd wine-platypus
 cp /path/to/Platypus7.Client.exe vendor/
 ./install-macos.sh
