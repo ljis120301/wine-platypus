@@ -1,9 +1,11 @@
-# wine-platypus
+# Platypus Billing (Tucows Platypus 7) on Linux and macOS with Wine
 
-Run the **Tucows Platypus Billing System client (Platypus 7)** on **Linux** and **macOS**
-through Wine: one installer script per platform, a proper application‑menu entry / `.app`,
-a dedicated Wine prefix, and an end‑of‑install self‑check that instantiates every COM class
-the application uses. No manual Wine tinkering.
+**wine-platypus** runs the **Tucows Platypus Billing System client** (Platypus 7, the ISP
+billing and provisioning system originally from Boardtown, `Platypus7.Client.exe` /
+`plat.exe`) on **Linux** and **macOS** through Wine, with no Windows virtual machine: one
+installer script per platform, a proper application‑menu entry / `.app`, a dedicated Wine
+prefix, and an end‑of‑install self‑check that instantiates every COM class the application
+uses. No manual Wine tinkering.
 
 Platypus is a Visual FoxPro 9 application from the Windows XP era. Most of it runs on Wine
 unmodified; the parts that don't are documented in [docs/how-it-works.md](docs/how-it-works.md)
@@ -155,3 +157,12 @@ docs/                how it works, rebuilding the patch, upstream notes, screens
 ```
 
 MIT licensed; see `THIRD-PARTY-NOTICES.md` for Tucows, Wine and Microsoft components.
+
+## 10. Also known as / if you searched for
+
+Platypus ISP Billing, Tucows Platypus, Boardtown Platypus, ispbilling.com, Platypus 7
+client, Platypus Billing System on Linux, Platypus on Mac, `plat.exe` under Wine, Visual
+FoxPro 9 application on Wine, SQL Server ODBC driver under Wine, or any of these messages:
+*Driver is probably out of resources*, *OLE error 0x80004001: Not implemented*, *OLE error
+0x8002000e*, *Class definition PLATYPUS.COM.… is not found*, *Fatal error: Exception code
+C0000005 parse_response_xml*. Section 7 above maps each one to its cause and fix.
