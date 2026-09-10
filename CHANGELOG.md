@@ -1,5 +1,26 @@
 # Changelog
 
+## v2.0.1 - 2026-09-09
+
+Bug fix: the patched `oleaut32` was being installed somewhere Wine never reads.
+
+`oleaut32` is a `\KnownDlls` section, which the loader builds from the Wine installation
+tree (`<wine>/lib*/wine/i386-windows/`) - not from the copy `wineboot` leaves in the
+prefix. v1.0.0 and v2.0.0 wrote the patched DLL only into the prefix *and actively
+restored the stock one* in the Wine tree, so the two COM fixes were inert: the
+"Handle E-mails" screen could still raise `OLE error 0x8002000e` and the log showed the
+stock `failed to convert param 0 to VT_DISPATCH from {VT_NULL}`. This went unnoticed
+because the Wine tree on the development machine was already patched by hand from an
+earlier approach; a fresh `uninstall.sh` + `install.sh` (which re-downloads a pristine
+Wine) exposed it.
+
+- The installer now patches **both** the Wine tree and the prefix copy, keeps a
+  `.wine-platypus.orig` backup, and records it in the config so `uninstall.sh` puts the
+  original back. It no longer reverts the Wine tree.
+- The launcher's self-heal restores the patched DLL in both places after a Wine update.
+- If the Wine tree cannot be written (a shared system Wine without permission), the
+  installer now says so loudly instead of silently leaving the fix inactive.
+
 ## v2.0.0 - 2026-09-09
 
 Same install behavior and flags as v1.0.0 - this release is about the installer holding

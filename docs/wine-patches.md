@@ -38,11 +38,16 @@ cp dlls/oleaut32/i386-windows/oleaut32.dll /path/to/wine-platypus/vendor/wine-pa
 cd /path/to/wine-platypus/vendor && sha256sum wine-patches/oleaut32-wine11.0-i386-builtin.dll tools/comcheck.exe tools/fixprogids.exe tools/ico2png.exe tools/comcheck-list.txt > SHA256SUMS
 ```
 
-Where it goes: Wine 11 loads a builtin from the prefix's `system32`/`syswow64` copy, which
-`wineboot` populates from `<wine>/lib*/wine/i386-windows/`. The installer therefore writes
-the rebuilt DLL (builtin marker intact) to both the install dir (backup kept as
-`.wine-platypus.orig`) and the existing prefix's system directory. Do not delete the
-prefix copy: with it missing, every import of oleaut32 fails and Platypus cannot start.
+Where it goes: `oleaut32` is a `\KnownDlls` section, and the loader builds it from the
+**Wine installation tree** (`<wine>/lib*/wine/i386-windows/`), not from the copy `wineboot`
+leaves in the prefix - `WINEDEBUG=+module` says `open_known_dll loaded ... from known dlls`.
+Patching only the prefix copy is therefore inert: the app keeps running stock `oleaut32`.
+(That mistake shipped once. It looked like it worked because the Wine tree was already
+patched by hand from an earlier attempt; a fresh Wine download exposed it.) The installer
+writes the rebuilt DLL (builtin marker intact) to both the install dir (backup kept as
+`.wine-platypus.orig`, recorded in the config so `uninstall.sh` restores it) and the
+existing prefix's system directory. Do not delete the prefix copy: with it missing, every
+import of oleaut32 fails and Platypus cannot start.
 
 Verification used during development: a small C program that late-binds
 `MSXML2.DOMDocument.appendChild(NULL)`. Stock Wine returns `0x80020005` (type mismatch) and

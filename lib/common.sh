@@ -567,12 +567,21 @@ REG
 # Wine 11.0 plus the rebuilt 32-bit builtin oleaut32.dll.
 #
 # Delivery: oleaut32 is loaded during Wine's own start-up, before a prefix's DLL
-# overrides are consulted, so a per-prefix "native" override cannot win for it. The fix
-# therefore REPLACES the builtin oleaut32.dll inside the Wine installation (a .orig
-# backup is kept and recorded for uninstall). Safe for the private Wine this installer
-# sets up; for a shared system Wine it needs write access (apt/dnf ran with sudo, so it
-# succeeds) and a Wine upgrade may revert it -- just re-run this installer. The patch is
-# additive (it only makes currently-failing calls succeed), so other Wine apps are fine.
+# overrides are consulted, so a per-prefix "native" override cannot win for it. It is also
+# a \KnownDlls section, which the loader builds from the WINE INSTALLATION TREE
+# (<wine>/lib*/wine/i386-windows/), not from the copy wineboot leaves in the prefix - the
+# loader trace says "loaded ... from known dlls". Patching only the prefix copy therefore
+# has NO effect: the app keeps running stock oleaut32 and the e-mail list keeps failing
+# with "failed to convert param 0 to VT_DISPATCH from {VT_NULL}" / OLE error 0x8002000e.
+# (An earlier revision of this installer believed the prefix copy was enough; it looked
+# that way only because the Wine tree happened to be patched from the previous method.)
+# So BOTH are written: the Wine tree (a .wine-platypus.orig backup is kept and recorded in
+# the config, and uninstall.sh puts it back) and the prefix copy, which must exist and be
+# valid regardless - deleting it makes every oleaut32 import fail and plat.exe will not
+# start. For the pinned portable Wine this is all inside $PLATYPUS_HOME. A shared system
+# Wine needs write access, and a Wine upgrade reverts it - just re-run this installer.
+# The patch is additive (it only makes currently-failing calls succeed), so other Wine
+# apps that use the same installation are unaffected.
 OLEAUT32_BACKUPS=""
 install_patched_oleaut32() {
   case "$WINE_VERSION" in
@@ -580,25 +589,36 @@ install_patched_oleaut32() {
     *) warn "Wine is $WINE_VERSION; the patched oleaut32 was built for Wine 11.x and is NOT installed."
        warn "The 'Handle E-mails' screen may misbehave (see docs/how-it-works.md)."; return 0 ;;
   esac
-  say "Installing patched oleaut32 into the prefix (object-argument + default-property-put fixes)"
-  # Wine 11 loads a builtin from the copy wineboot placed in the prefix's system32/syswow64,
-  # so only the prefix is touched - the Wine installation itself is never modified and other
-  # prefixes on the machine are unaffected. Keep a payload copy: wineboot re-creates the
-  # prefix copy after a Wine upgrade and the launcher then restores ours from it.
+  say "Installing patched oleaut32 (object-argument + default-property-put fixes)"
   local sysdir; sysdir="$(prefix_sysdir)"
   mkdir -p "$PLATYPUS_HOME/payload"; cp -f "$OLEAUT32_PATCHED" "$PLATYPUS_HOME/payload/oleaut32.dll"
+  # 1. the prefix copy (must stay a valid builtin; see above)
   if cp -f "$OLEAUT32_PATCHED" "$sysdir/oleaut32.dll.wine-platypus.new" 2>/dev/null && mv -f "$sysdir/oleaut32.dll.wine-platypus.new" "$sysdir/oleaut32.dll"; then
     ok "Patched oleaut32 placed in the prefix ($sysdir)"
   else
     rm -f "$sysdir/oleaut32.dll.wine-platypus.new" 2>/dev/null || true
-    warn "Could not place patched oleaut32 in $sysdir - the e-mail list will misbehave"
+    warn "Could not place patched oleaut32 in $sysdir"
   fi
-  # older versions of this installer also replaced the file inside the Wine installation;
-  # put the original back if such a backup exists next to it.
-  local wine_root t; wine_root="$(cd "$WINE_BIN_DIR/.." && pwd)"
-  while IFS= read -r -d '' t; do
-    [ -f "${t%.wine-platypus.orig}" ] && mv -f "$t" "${t%.wine-platypus.orig}" 2>/dev/null && ok "Restored original $(basename "${t%.wine-platypus.orig}") in the Wine installation"
-  done < <(find "$wine_root" -type f -name 'oleaut32.dll.wine-platypus.orig' -print0 2>/dev/null)
+  # 2. the Wine installation's 32-bit builtin - the copy the loader actually maps
+  local wine_root t done_tree=0; wine_root="$(cd "$WINE_BIN_DIR/.." && pwd)"
+  while IFS= read -r t; do
+    [ -n "$t" ] || continue
+    if cmp -s "$OLEAUT32_PATCHED" "$t"; then done_tree=1; ok "Wine's 32-bit oleaut32 already patched ($t)"; continue; fi
+    if [ ! -f "$t.wine-platypus.orig" ] && ! cp -f "$t" "$t.wine-platypus.orig" 2>/dev/null; then
+      warn "No write access to $t - cannot patch Wine's own oleaut32"; continue
+    fi
+    if cp -f "$OLEAUT32_PATCHED" "$t.wine-platypus.new" 2>/dev/null && mv -f "$t.wine-platypus.new" "$t" 2>/dev/null; then
+      OLEAUT32_BACKUPS="${OLEAUT32_BACKUPS:+$OLEAUT32_BACKUPS
+}$t"
+      done_tree=1; ok "Patched Wine's 32-bit oleaut32 ($t)"
+    else
+      rm -f "$t.wine-platypus.new" 2>/dev/null || true
+      warn "Could not replace $t (no write access?) - the e-mail list will misbehave"
+    fi
+  done <<EOF
+$(find "$wine_root" -type f -path '*i386-windows/oleaut32.dll' 2>/dev/null)
+EOF
+  [ "$done_tree" = "1" ] || warn "Wine's own oleaut32 was NOT patched - 'Handle E-mails' may raise OLE error 0x8002000e"
   wine_run reg delete 'HKCU\Software\Wine\DllOverrides' /v oleaut32 /f >/dev/null 2>&1 || true
 }
 
@@ -784,12 +804,24 @@ rm -rf "\$LOCK"; mkdir -p "\$LOCK"; echo \$\$ >"\$LOCK/pid"
 # keep serving the DLL images it already mapped, so updated DLLs would not be loaded).
 # wineserver -k acts on this prefix only.
 "$WINESERVER" -k >/dev/null 2>&1 || true
-# Self-heal: a Wine upgrade makes wineboot re-create the prefix's builtin oleaut32.dll,
-# losing our two fixes. Put ours back (only for the Wine 11.x it was built against).
-PAYLOAD="$PLATYPUS_HOME/payload/oleaut32.dll"; SYSDLL="$(prefix_sysdir)/oleaut32.dll"
-if [ -f "\$PAYLOAD" ] && ! cmp -s "\$PAYLOAD" "\$SYSDLL"; then
+# Self-heal: a Wine upgrade restores the stock oleaut32 and loses our two fixes. It has to
+# go back in BOTH places - the Wine tree (what the loader actually maps, via \KnownDlls)
+# and the prefix copy. Only for the Wine 11.x the patch was built against.
+PAYLOAD="$PLATYPUS_HOME/payload/oleaut32.dll"
+SYSDLL="$(prefix_sysdir)/oleaut32.dll"
+WINE_ROOT="$(cd "$WINE_BIN_DIR/.." && pwd)"
+if [ -f "\$PAYLOAD" ]; then
   case "\$("\$WINE" --version 2>/dev/null)" in
-    wine-11.*) cp -f "\$PAYLOAD" "\$SYSDLL.new" && mv -f "\$SYSDLL.new" "\$SYSDLL" && echo "restored patched oleaut32 after a Wine update" >>"\$LOG" ;;
+    wine-11.*)
+      find "\$WINE_ROOT" -type f -path '*i386-windows/oleaut32.dll' 2>/dev/null | while IFS= read -r t; do
+        cmp -s "\$PAYLOAD" "\$t" && continue
+        cp -f "\$PAYLOAD" "\$t.new" 2>/dev/null && mv -f "\$t.new" "\$t" 2>/dev/null \
+          && echo "restored patched oleaut32 in the Wine tree after an update" >>"\$LOG"
+      done
+      if ! cmp -s "\$PAYLOAD" "\$SYSDLL"; then
+        cp -f "\$PAYLOAD" "\$SYSDLL.new" && mv -f "\$SYSDLL.new" "\$SYSDLL" \
+          && echo "restored patched oleaut32 in the prefix after an update" >>"\$LOG"
+      fi ;;
     *) echo "WARNING: Wine is no longer 11.x; patched oleaut32 not applied (re-run the installer / see docs)" >>"\$LOG" ;;
   esac
 fi
