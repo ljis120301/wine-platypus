@@ -36,7 +36,7 @@ Tested with Wine 11.0 against a production SQL Server (TDS 7.4), in 32‑bit and
 
 | | Linux | macOS |
 |---|---|---|
-| OS | Ubuntu 22.04+/Debian 12+/Mint/Pop!_OS, Fedora 40+, Arch/CachyOS | macOS 12+, Intel or Apple Silicon |
+| OS | Ubuntu/Debian/Mint/Pop!_OS, Fedora/RHEL/Rocky/Alma, Arch/Manjaro/CachyOS, openSUSE (and most of their derivatives) | macOS 12+, Intel or Apple Silicon |
 | Disk | ~2 GB | ~2.5 GB |
 | Needs `sudo`? | only to install the small `cabextract` package | no (Homebrew) |
 | Tools | `git`, `curl` | `git`, [Homebrew](https://brew.sh) |

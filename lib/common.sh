@@ -20,7 +20,7 @@
 # manager and driver are dropped into the prefix instead. See docs/how-it-works.md
 # ---------------------------------------------------------------------------
 
-set -euo pipefail
+set -Eeuo pipefail
 
 REPO_DIR="${REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 VENDOR_DIR="$REPO_DIR/vendor"
@@ -52,14 +52,23 @@ MSXML6_PACKAGE="$VENDOR_DIR/msxml6-KB2957482-enu-amd64.exe"
 
 # ---- output helpers --------------------------------------------------------
 if [ -t 1 ]; then
-  C_B=$'\033[1m'; C_G=$'\033[32m'; C_Y=$'\033[33m'; C_R=$'\033[31m'; C_0=$'\033[0m'
+  C_B=$'\033[1m'; C_DIM=$'\033[2m'
+  C_G=$'\033[32m'; C_Y=$'\033[33m'; C_R=$'\033[31m'; C_C=$'\033[36m'
+  C_0=$'\033[0m'
 else
-  C_B=""; C_G=""; C_Y=""; C_R=""; C_0=""
+  C_B=""; C_DIM=""; C_G=""; C_Y=""; C_R=""; C_C=""; C_0=""
 fi
-say()  { printf '%s==>%s %s\n' "$C_B" "$C_0" "$*"; }
-ok()   { printf '%s ✔ %s %s\n' "$C_G" "$C_0" "$*"; }
-warn() { printf '%s ⚠ %s %s\n' "$C_Y" "$C_0" "$*" >&2; }
-die()  { printf '%s ✘ %s %s\n' "$C_R" "$C_0" "$*" >&2; exit 1; }
+say()  { printf '\n%s▸%s %s\n' "$C_C$C_B" "$C_0" "$*"; }
+ok()   { printf '  %s✔%s %s\n' "$C_G" "$C_0" "$*"; }
+warn() { printf '  %s⚠%s %s\n' "$C_Y" "$C_0" "$*" >&2; }
+die()  { printf '\n%s✘%s %s\n\n' "$C_R$C_B" "$C_0" "$*" >&2; exit 1; }
+
+hr() { printf '%s%s%s\n' "$C_DIM" "----------------------------------------------------------------" "$C_0"; }
+banner() {  # banner "Linux installer"
+  hr
+  printf '%s%swine-platypus%s %s· %s%s\n' "$C_B" "$C_C" "$C_0" "$C_DIM" "$1" "$C_0"
+  hr
+}
 
 # ask VAR "Prompt" "default"  -> sets VAR. With an empty default the answer is required:
 # it re-prompts interactively and fails in non-interactive mode (pass --server/--database).
@@ -70,7 +79,7 @@ ask() {
     eval "$_var=\"\$_def\""; return
   fi
   while :; do
-    if [ -n "$_def" ]; then printf '%s [%s]: ' "$_prompt" "$_def"; else printf '%s: ' "$_prompt"; fi
+    if [ -n "$_def" ]; then printf '  %s%s%s [%s]: ' "$C_B" "$_prompt" "$C_0" "$_def"; else printf '  %s%s%s: ' "$C_B" "$_prompt" "$C_0"; fi
     read -r _ans || true
     [ -n "$_ans" ] || _ans="$_def"
     [ -n "$_ans" ] && break
@@ -82,11 +91,70 @@ ask() {
 confirm() {  # confirm "question" -> 0 = yes
   local _ans=""
   if [ "$PLATYPUS_NONINTERACTIVE" = "1" ] || [ ! -t 0 ]; then return 0; fi
-  printf '%s [Y/n]: ' "$1"; read -r _ans || true
+  printf '  %s%s%s [Y/n]: ' "$C_B" "$1" "$C_0"; read -r _ans || true
   case "$_ans" in n|N|no|NO|No) return 1 ;; *) return 0 ;; esac
 }
 
+# menu VAR "Title" "option 1" "option 2" ...  -> sets VAR to the chosen number
+# (as text). Non-interactive/piped runs always get option 1, same as before
+# this existed - it only shows up when there is a real terminal to answer it.
+menu() {
+  local _var="$1" _title="$2"; shift 2
+  if [ "$PLATYPUS_NONINTERACTIVE" = "1" ] || [ ! -t 0 ]; then eval "$_var=1"; return; fi
+  printf '\n  %s%s%s\n' "$C_B" "$_title" "$C_0"
+  local _i=1 _opt
+  for _opt in "$@"; do printf '    %s%d)%s %s\n' "$C_C" "$_i" "$C_0" "$_opt"; _i=$((_i + 1)); done
+  local _ans=""
+  printf '  Choice [1]: '; read -r _ans || true
+  case "$_ans" in ''|*[!0-9]*) _ans=1 ;; esac
+  { [ "$_ans" -ge 1 ] && [ "$_ans" -le $(($# )) ]; } || _ans=1
+  eval "$_var=\"\$_ans\""
+}
+
 need_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+# ---- crash handling ---------------------------------------------------------
+# Every install step below checks whether its own work is already done before
+# doing it, so if something fails here, re-running the installer picks up
+# where it left off - nothing needs to be cleaned up by hand first.
+on_error() {
+  local code="$1" line="$2" cmd="$3" src="$4"
+  trap - ERR
+  printf '\n%s%s✘ Something went wrong%s\n\n' "$C_R" "$C_B" "$C_0" >&2
+  printf '  command : %s\n' "$cmd" >&2
+  printf '  where   : %s, line %s (exit code %s)\n' "${src##*/}" "$line" "$code" >&2
+  if [ -n "${LOG_DIR:-}" ] && [ -s "$LOG_DIR/install.log" ]; then
+    printf '  log     : %s\n\n' "$LOG_DIR/install.log" >&2
+    printf '  last lines of the log:\n' >&2
+    tail -n 8 "$LOG_DIR/install.log" | sed 's/^/    /' >&2
+    printf '\n' >&2
+  else
+    printf '\n' >&2
+  fi
+  printf '  Nothing is left half-installed - every step checks its own work first,\n' >&2
+  printf '  so fix the problem above and just run the installer again.\n\n' >&2
+  exit "$code"
+}
+on_interrupt() {
+  trap - INT
+  printf '\n%s⚠  Cancelled - nothing further was changed.%s\n\n' "$C_Y" "$C_0" >&2
+  exit 130
+}
+
+# ---- preflight: disk space ---------------------------------------------------
+# A run that dies halfway through unpacking a ~300 MB Wine prefix because the
+# disk filled up is a bad first impression - catch it up front instead.
+check_disk_space() {
+  local dir="$PLATYPUS_HOME" need_kb=800000   # ~800 MB: Wine download + unpack + prefix
+  while [ ! -d "$dir" ]; do dir="$(dirname "$dir")"; done
+  need_cmd df || return 0
+  local avail_kb; avail_kb="$(df -Pk "$dir" 2>/dev/null | awk 'NR==2 {print $4}')"
+  case "$avail_kb" in ''|*[!0-9]*) return 0 ;; esac
+  if [ "$avail_kb" -lt "$need_kb" ]; then
+    warn "Only $((avail_kb / 1024)) MB free where $PLATYPUS_HOME lives - this install needs roughly 800 MB"
+    confirm "Continue anyway?" || die "Free up some disk space and re-run the installer"
+  fi
+}
 
 # ---- paths -----------------------------------------------------------------
 init_paths() {
@@ -190,17 +258,19 @@ ensure_portable_wine() {
     warn "$dest holds $v, not $PLATYPUS_WINE_PIN_VERSION - replacing it"
   fi
   local tb="${PLATYPUS_WINE_TARBALL:-$PLATYPUS_HOME/wine-pinned.tar.xz}"
+  local dl_fail="Could not download Wine from $PLATYPUS_WINE_PIN_URL - check your internet connection and try again (or download it yourself and re-run with PLATYPUS_WINE_TARBALL=/path/to/file.tar.xz)"
   if [ ! -f "$tb" ]; then
     say "Downloading pinned Wine ($PLATYPUS_WINE_PIN_VERSION, ~70 MB)"
-    if need_cmd curl; then curl -fL --progress-bar -o "$tb.part" "$PLATYPUS_WINE_PIN_URL"
-    elif need_cmd wget; then wget -q --show-progress -O "$tb.part" "$PLATYPUS_WINE_PIN_URL"
+    if need_cmd curl; then curl -fL --progress-bar -o "$tb.part" "$PLATYPUS_WINE_PIN_URL" || { rm -f "$tb.part"; die "$dl_fail"; }
+    elif need_cmd wget; then wget -q --show-progress -O "$tb.part" "$PLATYPUS_WINE_PIN_URL" || { rm -f "$tb.part"; die "$dl_fail"; }
     else die "Need curl or wget to download Wine (or set PLATYPUS_WINE_TARBALL to a local copy)"; fi
     mv -f "$tb.part" "$tb"
   fi
   local sum; if need_cmd sha256sum; then sum="$(sha256sum "$tb" | cut -d' ' -f1)"; else sum="$(shasum -a 256 "$tb" | cut -d' ' -f1)"; fi
-  [ "$sum" = "$PLATYPUS_WINE_PIN_SHA256" ] || die "Wine tarball checksum mismatch ($sum) - refusing to use it"
+  [ "$sum" = "$PLATYPUS_WINE_PIN_SHA256" ] || die "Wine tarball checksum mismatch (got $sum) - delete $tb and re-run to download it again"
   say "Unpacking pinned Wine into $dest"
-  rm -rf "$dest.new"; mkdir -p "$dest.new"; tar -xJf "$tb" -C "$dest.new" --strip-components=1
+  rm -rf "$dest.new"; mkdir -p "$dest.new"
+  tar -xJf "$tb" -C "$dest.new" --strip-components=1 || die "The Wine archive at $tb looks corrupt - delete it and re-run the installer to download it again"
   rm -rf "$dest"; mv "$dest.new" "$dest"
   [ -x "$dest/bin/wine" ] || die "Unpacked Wine has no bin/wine"
   PLATYPUS_WINE="$dest/bin/wine"; ok "Pinned Wine installed ($("$dest/bin/wine" --version))"
