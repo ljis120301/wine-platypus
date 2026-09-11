@@ -8,6 +8,7 @@ Binary payloads the installer needs. Nothing proprietary is committed here.
 | `MDAC_TYP.EXE` | MDAC 2.8 SP1: ODBC driver manager, "SQL Server" ODBC driver, ADO | downloaded on first install (sha256 verified) |
 | `VC6RedistSetup_deu.exe` | Visual C++ 6.0 runtime (only `mfc42.dll`/`mfc42u.dll` are used) | downloaded on first install |
 | `VB6.0-KB290887-X86.exe` | Visual Basic 6.0 SP6 runtime (only `msvbvm60.dll` is used) | downloaded on first install |
+| `msvbvm60.dll`, `mfc42.dll`, `mfc42u.dll` *(optional)* | **newer** VB6/MFC runtimes, preferred over the SP6/VC6 copies above | **You supply them** from a Windows `SysWOW64`. Not in the repo; `.gitignore`d. See below. |
 | `msxml3.msi`, `msxml.msi`, `msxml6-KB2957482-enu-amd64.exe` | MSXML 3.0 SP7 / 4.0 SP3 / 6.0 SP2 | downloaded on first install |
 | `wine-patches/oleaut32-wine11.0-i386-builtin.dll` + `.patch` | Wine 11.0 `oleaut32.dll` rebuilt with two COM fixes | built by us, see `docs/wine-patches.md` |
 | `tools/comcheck.exe`, `tools/fixprogids.exe`, `tools/ico2png.exe`, `tools/comcheck-list.txt` | our helpers (sources in `tools/src/`) | built by us |
@@ -39,3 +40,27 @@ serves a truncated file, which it does now and then; if every source fails, wait
 
 The downloaded packages, and your Platypus installer, are ignored by git (`.gitignore`),
 so they never end up in a fork or pull request by accident.
+
+## Optional: newer VB6 / MFC runtimes
+
+The redistributables above are the newest Microsoft ever shipped standalone, and the VB6
+one has a defect that matters here: `msvbvm60.dll` **6.00.9782** dereferences a NULL object
+pointer when Platypus opens the e-mail editor, killing the app with `C0000005` inside
+msvbvm60 (the VFP traceback only says `platmain`, so it looks like it comes from nowhere).
+Windows carries a newer serviced build, **6.00.9848**, which does not. `mfc42.dll` /
+`mfc42u.dll` differ the same way - **6.00.8665** from the VC6 redist versus **6.06.8063**
+in Windows - and back the `ct*` calendar controls.
+
+Those newer builds are serviced through Windows Update, not published as a download (the
+VB6 SP6 Cumulative Update, KB2708437, only refreshes the VB6 *controls*), so they can be
+neither fetched nor redistributed by this project. If you have a Windows machine you are
+licensed to use, copy these out of its `C:\Windows\SysWOW64` into `vendor/`:
+
+```
+vendor/msvbvm60.dll     6.00.9848
+vendor/mfc42.dll        6.06.8063.0
+vendor/mfc42u.dll       6.06.8063.0
+```
+
+The installer prefers them automatically and says so; without them it uses the SP6/VC6
+copies and prints a warning that opening an e-mail may crash.

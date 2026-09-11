@@ -1,5 +1,36 @@
 # Changelog
 
+## v2.1.0 - 2026-09-11
+
+Fixes the crash when opening an e-mail, and lets newer VB6/MFC runtimes be supplied.
+
+The VB6 SP6 redistributable ships `msvbvm60.dll` 6.00.9782, and that build dereferences a
+NULL object pointer as the e-mail editor opens: `movl 0x28(%edi)` with `edi=0`, a hard
+`C0000005` inside msvbvm60 called straight from `vfp9r`. The VFP traceback shows only
+`platmain`, so there is nothing in the app to point at. Windows carries a newer serviced
+build, 6.00.9848, where the same screen works; MFC42 differs the same way (6.00.8665 vs
+6.06.8063) and backs the `ct*` calendar controls.
+
+Microsoft never shipped those builds standalone - they are serviced through Windows - so
+they are neither downloadable nor redistributable. The installer now prefers
+`vendor/msvbvm60.dll`, `vendor/mfc42.dll` and `vendor/mfc42u.dll` when present, falling
+back to the SP6/VC6 copies with a warning when they are not. Copy them from a Windows
+machine's `SysWOW64`.
+
+Ruled out along the way, recorded so it is not re-investigated:
+
+- The patched `oleaut32` is **not** responsible - the crash reproduces identically with the
+  stock DLL. (That test also re-confirmed the oleaut32 patch is doing its job: the old
+  `MSGASSIGN` / `0x8002000e` failure reappears without it.)
+- 65 Crystal/BusinessObjects classes that a working Windows install registers cannot be
+  instantiated here, but not because of a registration gap: they register fine and their
+  `DllGetClassObject` then returns `CLASS_E_CLASSNOTAVAILABLE` (COM reports the misleading
+  `REGDB_E_CLASSNOTREG` afterwards). These are report-export and Enterprise-server classes
+  that most likely refuse on Windows too, so nothing is registered speculatively.
+- Wine Gecko is genuinely absent from the prefix (only a stub `npmshtml.dll`), but
+  installing 2.47.4 did not change the black rectangle seen when opening an e-mail, so it
+  is not shipped as a fix for that.
+
 ## v2.0.2 - 2026-09-10
 
 Bug fix: the OLE DB cursor engine was never installed, which killed the app outright on

@@ -5,3 +5,8 @@ vendor/*.msi
 *.log
 .DS_Store
 vendor/*.part
+# newer VB6/MFC runtimes are serviced through Windows, not redistributable:
+# supply them yourself from a Windows SysWOW64 (see vendor/README.md)
+vendor/msvbvm60.dll
+vendor/mfc42.dll
+vendor/mfc42u.dll

@@ -479,6 +479,31 @@ REG
 # app later raises "class not registered" / OLE errors. Both runtimes come from
 # Microsoft redistributables (VB6 SP6 runtime, VC6 redist) that we extract with
 # cabextract; afterwards the controls are registered again.
+# The VB6 SP6 redistributable ships msvbvm60 6.00.9782, and that build dereferences a
+# NULL object pointer when the app opens the e-mail editor: a hard C0000005 inside
+# msvbvm60 (movl 0x28(%edi) with edi=0), reached straight from vfp9r. Windows itself
+# carries a newer serviced build - 6.00.9848 - and the same screen is fine there. The
+# same goes for MFC42: 6.00.8665 from the VC6 redist vs 6.06.8063 in Windows, used by
+# the ct* calendar controls.
+#
+# Microsoft never shipped those newer builds as a standalone redistributable (they are
+# serviced through Windows), so they cannot be downloaded and must not be redistributed.
+# Instead they are picked up from vendor/ when present - drop msvbvm60.dll / mfc42.dll /
+# mfc42u.dll from a Windows SysWOW64 in there and they win over the SP6 copies.
+install_newer_vb6_mfc() {
+  local sysdir="$1" f found=0
+  for f in msvbvm60.dll mfc42.dll mfc42u.dll; do
+    [ -f "$VENDOR_DIR/$f" ] || continue
+    cmp -s "$VENDOR_DIR/$f" "$sysdir/$f" && { found=1; continue; }
+    if cp -f "$VENDOR_DIR/$f" "$sysdir/$f.new" 2>/dev/null && mv -f "$sysdir/$f.new" "$sysdir/$f"; then
+      found=1; ok "Using the newer $f supplied in vendor/"
+    else
+      rm -f "$sysdir/$f.new" 2>/dev/null || true; warn "Could not install vendor/$f"
+    fi
+  done
+  [ "$found" = 1 ] || warn "vendor/msvbvm60.dll not supplied - opening an e-mail can crash in the VB6 runtime (see docs/how-it-works.md)"
+}
+
 install_vb6_mfc_runtimes() {
   local sysdir; sysdir="$(prefix_sysdir)"
   if [ ! -f "$sysdir/msvbvm60.dll" ] || [ ! -f "$sysdir/mfc42.dll" ]; then
@@ -498,6 +523,7 @@ install_vb6_mfc_runtimes() {
   else
     ok "VB6/MFC42 runtimes already present"
   fi
+  install_newer_vb6_mfc "$sysdir"
   say "Registering ActiveX controls that depend on those runtimes"
   local regsvr; regsvr="$(prefix_regsvr32)"
   local pf; pf="$(prefix_pf32_win)"

@@ -57,6 +57,19 @@ sferrormgr*), hiding the real error behind it. Microsoft's ADO 2.8 from the MDAC
 package is installed instead (`install_native_ado`), exactly what winetricks' `mdac28`
 verb does.
 
+**The VB6 runtime build matters (`msvbvm60.dll`).** The VB6 SP6 redistributable the
+installer extracts ships 6.00.9782, and that build dereferences a NULL object pointer when
+the e-mail editor opens - `movl 0x28(%edi)` with `edi=0`, a hard `C0000005` inside
+msvbvm60 reached straight from `vfp9r`, with nothing but `platmain` in the VFP traceback.
+Windows carries a newer serviced build, 6.00.9848, where the same screen works; MFC42
+differs the same way (6.00.8665 from the VC6 redist vs 6.06.8063 in Windows) and backs the
+`ct*` calendar controls. Microsoft never released those newer builds standalone - they are
+serviced through Windows, and the SP6 Cumulative Update (KB2708437) only refreshes the VB6
+*controls* - so this project can neither download nor redistribute them. The installer
+uses `vendor/msvbvm60.dll`, `vendor/mfc42.dll` and `vendor/mfc42u.dll` when you supply
+them and falls back to the SP6/VC6 copies with a warning when you do not. Copy them out of
+a Windows machine's `SysWOW64` (they are gitignored and never committed here).
+
 **The OLE DB cursor engine (`msadce.dll`).** ADO ships the client-side cursor in a
 separate DLL, created as CLSID `{3FF292B6-B204-11CF-8D23-00AA005FFE58}`. `ADODB.Recordset`
 instantiates fine without it, so a self-check that only creates objects will not notice it
