@@ -23,6 +23,10 @@ tu_app.appConnector
 ADODB.Stream
 ADODB.Connection
 ADODB.Recordset
+# ADODB.* instantiate even when the cursor engine is absent, so check it directly:
+# client-side (disconnected) recordsets - what the DBF->Recordset conversion builds -
+# cannot be opened without it, and ADO's failure path then crashes Wine's combase.
+{3FF292B6-B204-11CF-8D23-00AA005FFE58}   # msadce.dll: Microsoft OLE DB Cursor Engine
 # --- XML / HTTP ---
 MSXML2.DOMDocument
 MSXML2.DOMDocument.3.0

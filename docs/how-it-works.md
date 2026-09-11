@@ -57,6 +57,18 @@ sferrormgr*), hiding the real error behind it. Microsoft's ADO 2.8 from the MDAC
 package is installed instead (`install_native_ado`), exactly what winetricks' `mdac28`
 verb does.
 
+**The OLE DB cursor engine (`msadce.dll`).** ADO ships the client-side cursor in a
+separate DLL, created as CLSID `{3FF292B6-B204-11CF-8D23-00AA005FFE58}`. `ADODB.Recordset`
+instantiates fine without it, so a self-check that only creates objects will not notice it
+is missing - but *opening* a client-side (disconnected) recordset needs it, which is what
+the app's DBF-to-Recordset conversion (`dbf2rs`, reached from the customer ticket list and
+the Rates screen) builds. Worse, the failure is not graceful: ADO's error path hands
+`SetErrorInfo` an uninitialised `IErrorInfo`, Wine's combase dereferences it, and the
+process dies with `C0000005` inside the *error handler* - so the VFP traceback blames
+`logger.log`/`sferrormgr` and hides the real cause. `msadce.dll` (+ `msadcer.dll`) come
+from the same MDAC package and are installed and registered alongside ADO; the self-check
+now instantiates that CLSID directly so a regression is caught at install time.
+
 **Two `oleaut32` COM defects behind the *Handle E-mails* screen.** The mscomctl ListView
 that screen uses exercises two automation behaviours Wine 11 gets wrong:
 

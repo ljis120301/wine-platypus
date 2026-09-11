@@ -518,19 +518,29 @@ install_vb6_mfc_runtimes() {
 }
 
 
-# ---- 3c. Microsoft ADO (from MDAC) ---------------------------------------------------
+# ---- 3c. Microsoft ADO + OLE DB cursor engine (from MDAC) ----------------------------
 # Platypus's error logger writes its log through ADODB.Stream (WriteText in "write line"
 # mode, UTF-8). Wine's own ADO only supports one write mode and one charset, so every
 # error the app tries to log turns into "OLE error code 0x80004001: Not implemented".
 # MDAC 2.8's ADO is installed instead (the same thing winetricks' mdac28 does).
+#
+# The cursor engine (msadce.dll) goes in with it. ADODB.Recordset instantiates happily
+# without it - which is why the self-check used to pass - but OPENING a client-side
+# recordset needs it, and the failure is not graceful: ADO's error path hands
+# SetErrorInfo an uninitialised IErrorInfo and Wine's combase dereferences it, so the
+# whole app dies with C0000005 instead of raising an error VFP could trap. The
+# self-check now instantiates the cursor engine's CLSID directly.
 install_native_ado() {
   local sysdir; sysdir="$(prefix_sysdir)"
   local ado; ado="$PREFIX/drive_c/$(prefix_pf32_win | sed 's|^C:\\||; s|\\|/|g')/Common Files/System/ADO"
   mkdir -p "$ado"
-  if [ -f "$ado/msado15.dll" ] && ! grep -q "Wine builtin DLL" "$ado/msado15.dll" 2>/dev/null; then
-    ok "Microsoft ADO already installed"
+  # msadce.dll is checked separately: an install from before it was shipped has a
+  # perfectly good msado15 and would otherwise skip this whole block.
+  if [ -f "$ado/msado15.dll" ] && ! grep -q "Wine builtin DLL" "$ado/msado15.dll" 2>/dev/null \
+     && [ -f "$sysdir/msadce.dll" ]; then
+    ok "Microsoft ADO and cursor engine already installed"
   else
-    say "Installing Microsoft ADO 2.8 (ADODB.Stream is needed by the Platypus error logger)"
+    say "Installing Microsoft ADO 2.8 and the OLE DB cursor engine"
     local tmp; tmp="$(mktemp -d "${TMPDIR:-/tmp}/ado.XXXXXX")"
     cabextract -q -d "$tmp" -F mdacxpak.cab "$MDAC_PACKAGE"
     mkdir -p "$tmp/x"; cabextract -q -d "$tmp/x" "$tmp/mdacxpak.cab"
@@ -539,6 +549,13 @@ install_native_ado() {
       cp -f "$tmp/x/$f" "$ado/$f"
     done
     cp -f "$tmp/x/msdart.dll" "$sysdir/msdart.dll"
+    # Cursor engine (+ its resource DLL). A client-side/disconnected Recordset - which is
+    # what the app's DBF->Recordset conversion builds - is served by this, NOT by msado15:
+    # ADO creates CLSID {3FF292B6-B204-11CF-8D23-00AA005FFE58} for it. Without it that
+    # CreateInstance fails and ADO then passes SetErrorInfo an uninitialised IErrorInfo,
+    # which Wine's combase dereferences -> C0000005 kills the app instead of raising a
+    # catchable error. Costs nothing to ship: both files are already inside MDAC_TYP.EXE.
+    for f in msadce.dll msadcer.dll; do cp -f "$tmp/x/$f" "$sysdir/$f"; done
     rm -rf "$tmp"
   fi
   local regf="$PREFIX/drive_c/windows/temp/ado.reg"
@@ -551,8 +568,9 @@ Windows Registry Editor Version 5.00
 REG
   wine_run "$(prefix_regedit)" /S 'C:\windows\temp\ado.reg'
   wine_run "$(prefix_regsvr32)" /s "$(prefix_pf32_win)\\Common Files\\System\\ADO\\msado15.dll" || warn "regsvr32 msado15.dll failed (see $LOG_DIR/install.log)"
+  wine_run "$(prefix_regsvr32)" /s 'C:\windows\system32\msadce.dll' || warn "regsvr32 msadce.dll failed - client-side recordsets will not work (see $LOG_DIR/install.log)"
   wine_wait
-  ok "Microsoft ADO installed and registered"
+  ok "Microsoft ADO and cursor engine installed and registered"
 }
 
 # ---- 3d. Patched oleaut32 (Wine COM bugs that break the e-mail list) -----------------

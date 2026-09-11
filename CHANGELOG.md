@@ -1,5 +1,30 @@
 # Changelog
 
+## v2.0.2 - 2026-09-10
+
+Bug fix: the OLE DB cursor engine was never installed, which killed the app outright on
+any screen that builds a client-side recordset (the customer ticket list / Rates).
+
+ADO keeps its client-side cursor in a separate DLL, `msadce.dll`, created as CLSID
+`{3FF292B6-B204-11CF-8D23-00AA005FFE58}`. We installed ADO but not that, so *opening* a
+disconnected recordset - what the app's DBF-to-Recordset conversion (`dbf2rs`) does -
+failed. The failure is not graceful: ADO's error path hands `SetErrorInfo` an
+uninitialised `IErrorInfo`, Wine's combase dereferences it, and the process dies with
+`C0000005`. Because the crash lands in the *error handler*, the VFP traceback blames
+`logger.log` / `sferrormgr` and hides the real cause.
+
+- `msadce.dll` and `msadcer.dll` are now installed and registered alongside ADO. They
+  come from the MDAC package already vendored/downloaded, so nothing new is shipped.
+- The self-check now instantiates the cursor engine's CLSID directly. It previously
+  reported `fail=0` on a broken install because `ADODB.Recordset` creates fine without
+  the cursor engine - only *opening* a client-side recordset needs it.
+- Upgrading an existing install works: the ADO step no longer short-circuits just
+  because `msado15.dll` is already present.
+
+Still outstanding: Wine's `SetErrorInfo` dereferences whatever pointer it is handed, so a
+*different* missing/failing COM class inside ADO could still turn a catchable error into a
+crash. Installing the cursor engine removes the known trigger, not that sharp edge.
+
 ## v2.0.1 - 2026-09-09
 
 Bug fix: the patched `oleaut32` was being installed somewhere Wine never reads.
