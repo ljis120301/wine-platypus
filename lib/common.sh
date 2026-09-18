@@ -274,6 +274,20 @@ ensure_portable_wine() {
   fi
   local tb="${PLATYPUS_WINE_TARBALL:-$PLATYPUS_HOME/wine-pinned.tar.xz}"
   local dl_fail="Could not download Wine from $PLATYPUS_WINE_PIN_URL - check your internet connection and try again (or download it yourself and re-run with PLATYPUS_WINE_TARBALL=/path/to/file.tar.xz)"
+  # A tarball cached by a PREVIOUS pin will not match the new checksum. Discard and
+  # re-download it instead of failing: bumping the pinned Wine must not require every
+  # existing install to delete a file by hand first (v2.2.0 did exactly that - every
+  # machine upgrading from 11.0 hit "Wine tarball checksum mismatch" and stopped).
+  # Only ever auto-delete OUR cache; a tarball the user pointed at with
+  # PLATYPUS_WINE_TARBALL is theirs, so that one still errors out below untouched.
+  if [ -f "$tb" ] && [ -z "$PLATYPUS_WINE_TARBALL" ]; then
+    local have
+    if need_cmd sha256sum; then have="$(sha256sum "$tb" | cut -d' ' -f1)"; else have="$(shasum -a 256 "$tb" | cut -d' ' -f1)"; fi
+    if [ "$have" != "$PLATYPUS_WINE_PIN_SHA256" ]; then
+      warn "Cached Wine tarball is for a different version - re-downloading $PLATYPUS_WINE_PIN_VERSION"
+      rm -f "$tb"
+    fi
+  fi
   if [ ! -f "$tb" ]; then
     say "Downloading pinned Wine ($PLATYPUS_WINE_PIN_VERSION, ~94 MB)"
     if need_cmd curl; then curl -fL --progress-bar -o "$tb.part" "$PLATYPUS_WINE_PIN_URL" || { rm -f "$tb.part"; die "$dl_fail"; }

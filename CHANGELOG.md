@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.2.1 - 2026-09-17
+
+Fixes the v2.2.0 upgrade path.
+
+`ensure_portable_wine` only downloaded the pinned Wine when no tarball was cached, then
+checksummed whatever was there against the expected hash and gave up on a mismatch. So every
+machine upgrading from v2.1.0 - which has the **11.0** tarball sitting in
+`$PLATYPUS_HOME/wine-pinned.tar.xz` - stopped with *"Wine tarball checksum mismatch ... delete
+it and re-run"* before installing anything. The message said what to do, but requiring each
+user to delete a file by hand defeats the point of a one-command installer.
+
+A cached tarball whose checksum does not match the current pin is now treated as stale:
+it is discarded and re-downloaded automatically. A tarball the user supplied explicitly via
+`PLATYPUS_WINE_TARBALL` is never deleted - that one still reports the mismatch, since
+silently removing a file someone pointed at would be wrong.
+
 ## v2.2.0 - 2026-09-17
 
 Moves the pinned Wine to 11.14, which fixes the "black rectangle", and stops the launcher
