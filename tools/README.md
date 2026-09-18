@@ -16,3 +16,10 @@ Sources for the small Windows helpers in `vendor/tools/` (built with MinGW-w64, 
   fails on Wine's msxml3, passes with Microsoft's - used to validate `install_native_msxml`.
 * `ico2png.c` -> `ico2png.exe`: writes the largest PNG entry of a .ico to a .png; used at install
   time to take the app icon from the installed client instead of shipping it.
+* `blackbox.c` -> `blackbox.exe`: demonstrates Wine's *deliberate* "delayed unmapping"
+  behaviour - it is **not** a regression test for winehq bug 59378, despite looking like one.
+  It hides a window by clearing `WS_VISIBLE` without `SWP_HIDEWINDOW`; the window stays
+  mapped and Wine logs `not yet hidden, delaying unmapping` on the `x11drv` channel,
+  identically on Wine 11.0 and 11.14 (measured on both). The 59378 fix changed only which
+  state field gates that condition, which matters in a race, so this cannot tell the
+  versions apart. Kept because mistaking it for a reproduction cost real debugging time.

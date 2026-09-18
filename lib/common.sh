@@ -29,7 +29,7 @@ PLATYPUS_INSTALLER="$VENDOR_DIR/Platypus7.Client.exe"
 MDAC_PACKAGE="$VENDOR_DIR/MDAC_TYP.EXE"
 VC6_PACKAGE="$VENDOR_DIR/VC6RedistSetup_deu.exe"
 VB6_PACKAGE="$VENDOR_DIR/VB6.0-KB290887-X86.exe"
-OLEAUT32_PATCHED="$VENDOR_DIR/wine-patches/oleaut32-wine11.0-i386-builtin.dll"
+OLEAUT32_PATCHED="$VENDOR_DIR/wine-patches/oleaut32-wine11.14-i386-builtin.dll"
 TOOLS_DIR="$VENDOR_DIR/tools"
 MSXML3_PACKAGE="$VENDOR_DIR/msxml3.msi"
 MSXML4_PACKAGE="$VENDOR_DIR/msxml.msi"
@@ -43,12 +43,27 @@ MSXML6_PACKAGE="$VENDOR_DIR/msxml6-KB2957482-enu-amd64.exe"
 : "${PLATYPUS_WINEARCH:=}"        # empty = auto (win32 when the Wine build supports it, else win64)
 : "${PLATYPUS_WINE:=}"            # path to a specific `wine` binary (portable builds, testing)
 : "${PLATYPUS_THEME:=light}"      # light (Wine default since 10.0) or classic (Windows 2000 look)
-# Pinned portable Wine for Linux (vanilla WineHQ 11.0 sources, Kron4ek build, WoW64 flavour:
+# Pinned portable Wine for Linux (vanilla WineHQ sources, Kron4ek build, WoW64 flavour:
 # runs 32-bit apps without any 32-bit host libraries). Changing Wine = re-validate + bump here.
-: "${PLATYPUS_WINE_PIN_VERSION:=wine-11.0}"
-: "${PLATYPUS_WINE_PIN_URL:=https://github.com/Kron4ek/Wine-Builds/releases/download/11.0/wine-11.0-amd64-wow64.tar.xz}"
-: "${PLATYPUS_WINE_PIN_SHA256:=39574efa1132c3ca0d5c77dd2eddbe4a49cca0d6cc2c290ff4924493a1c40314}"
+#
+# Why 11.14 and not 11.0: Wine 11.0 shows a "black rectangle" - an opaque leftover window
+# floating over the app after one of its own windows closes, holding whatever was last drawn
+# into it. Confirmed fixed by this upgrade. The cause is almost certainly winehq bug 59378
+# (a winex11 race leaving a properly hidden window mapped; fix 2b05f63811f0, "winex11: Use
+# the desired state for mapping delays", shipped in 11.13), though the jump spans 11.1-11.14
+# so it is not a bisected certainty. 11.14 also carries MDI window fixes and #30824, an
+# msvbvm60 crash in the same runtime v2.1.0 works around. 11.15+ keep reworking window
+# state, so stop at 11.14.
+: "${PLATYPUS_WINE_PIN_VERSION:=wine-11.14}"
+: "${PLATYPUS_WINE_PIN_URL:=https://github.com/Kron4ek/Wine-Builds/releases/download/11.14/wine-11.14-amd64-wow64.tar.xz}"
+: "${PLATYPUS_WINE_PIN_SHA256:=707956fa1574ad1660c4d7f2cfd9c024e0f437ad0a2d501a53b717adb1288222}"
 : "${PLATYPUS_WINE_TARBALL:=}"    # optional: local copy of the tarball (offline installs / tests)
+# Which Wine the vendored oleaut32.dll was built from. Neither of its two fixes is upstream
+# (both defects are still present in Wine 11.17), so it must be rebuilt whenever the pin
+# moves - see docs/wine-patches.md. Matched exactly rather than as "wine-11.*": dropping a
+# builtin from one 11.x into another's tree loads without complaint and then misbehaves
+# subtly, so the installer would rather skip the patch loudly than guess.
+: "${PLATYPUS_OLEAUT32_WINE_VERSION:=wine-11.14}"
 
 # ---- output helpers --------------------------------------------------------
 if [ -t 1 ]; then
@@ -247,7 +262,7 @@ check_vendor_files() {
 
 # ---- wine discovery --------------------------------------------------------
 # ---- 0. pinned portable Wine (Linux default) ---------------------------------------------
-# Puts a checksummed Wine 11.0 into $PLATYPUS_HOME/wine so the install does not depend on -
+# Puts a checksummed Wine 11.14 into $PLATYPUS_HOME/wine so the install does not depend on -
 # and cannot be broken by - the distro's Wine package or its upgrades. Re-used if already
 # present with the pinned version. Needs curl or wget, tar, xz.
 ensure_portable_wine() {
@@ -260,7 +275,7 @@ ensure_portable_wine() {
   local tb="${PLATYPUS_WINE_TARBALL:-$PLATYPUS_HOME/wine-pinned.tar.xz}"
   local dl_fail="Could not download Wine from $PLATYPUS_WINE_PIN_URL - check your internet connection and try again (or download it yourself and re-run with PLATYPUS_WINE_TARBALL=/path/to/file.tar.xz)"
   if [ ! -f "$tb" ]; then
-    say "Downloading pinned Wine ($PLATYPUS_WINE_PIN_VERSION, ~70 MB)"
+    say "Downloading pinned Wine ($PLATYPUS_WINE_PIN_VERSION, ~94 MB)"
     if need_cmd curl; then curl -fL --progress-bar -o "$tb.part" "$PLATYPUS_WINE_PIN_URL" || { rm -f "$tb.part"; die "$dl_fail"; }
     elif need_cmd wget; then wget -q --show-progress -O "$tb.part" "$PLATYPUS_WINE_PIN_URL" || { rm -f "$tb.part"; die "$dl_fail"; }
     else die "Need curl or wget to download Wine (or set PLATYPUS_WINE_TARBALL to a local copy)"; fi
@@ -322,8 +337,15 @@ wine_wait() { [ -n "${WINESERVER:-}" ] && [ -x "$WINESERVER" ] && WINEPREFIX="$P
 wine_kill() { [ -n "${WINESERVER:-}" ] && [ -x "$WINESERVER" ] && WINEPREFIX="$PREFIX" "$WINESERVER" -k 2>/dev/null || true; }
 
 # run wine quietly inside the prefix; logs go to $LOG_DIR/install.log
+# mscoree=d on every call, not just at prefix creation: Platypus is Visual FoxPro, not .NET,
+# and never needs Mono. Without this, the first wine run after the pinned Wine version
+# changes pops a modal "Wine could not find a wine-mono package ... Install?" dialog and
+# blocks the install - a new Wine means a new wine.inf mtime, so wineboot re-runs the prefix
+# update against the existing prefix, where the creation-time overrides no longer apply.
+# Gecko (mshtml) is deliberately NOT suppressed: some screens do want it.
 wine_run() {
   WINEPREFIX="$PREFIX" WINEDEBUG="${WINEDEBUG:--all}" \
+  WINEDLLOVERRIDES="mscoree=d${WINEDLLOVERRIDES:+;$WINEDLLOVERRIDES}" \
     "$WINE" "$@" >>"$LOG_DIR/install.log" 2>&1
 }
 
@@ -608,7 +630,7 @@ REG
 #     returned object's default member (repopulating subitems: ListSubItems(n) = text)
 #     -> deleting a message raises "OLE error 0x8002000e".
 # Windows' oleaut32 handles both. vendor/wine-patches/ holds a source patch against
-# Wine 11.0 plus the rebuilt 32-bit builtin oleaut32.dll.
+# Wine 11.14 plus the rebuilt 32-bit builtin oleaut32.dll.
 #
 # Delivery: oleaut32 is loaded during Wine's own start-up, before a prefix's DLL
 # overrides are consulted, so a per-prefix "native" override cannot win for it. It is also
@@ -628,10 +650,14 @@ REG
 # apps that use the same installation are unaffected.
 OLEAUT32_BACKUPS=""
 install_patched_oleaut32() {
+  # Matched exactly, not as "wine-11.*". A builtin built from one 11.x and dropped into
+  # another's tree loads without complaint and misbehaves subtly, which is far worse than
+  # skipping the patch and saying so.
   case "$WINE_VERSION" in
-    wine-11.*) ;;
-    *) warn "Wine is $WINE_VERSION; the patched oleaut32 was built for Wine 11.x and is NOT installed."
-       warn "The 'Handle E-mails' screen may misbehave (see docs/how-it-works.md)."; return 0 ;;
+    "$PLATYPUS_OLEAUT32_WINE_VERSION") ;;
+    *) warn "Wine is $WINE_VERSION but the vendored oleaut32 was built from $PLATYPUS_OLEAUT32_WINE_VERSION - NOT installed."
+       warn "Rebuild it against this Wine (docs/wine-patches.md). Until then the 'Handle E-mails'"
+       warn "screen raises OLE error 0x8002000e and e-mail rows cannot be selected."; return 0 ;;
   esac
   say "Installing patched oleaut32 (object-argument + default-property-put fixes)"
   local sysdir; sysdir="$(prefix_sysdir)"
@@ -827,11 +853,24 @@ else
 fi
 # ODBC overrides are ALSO set in the registry; the env form is needed because Wine
 # ignores registry DLL overrides on the very first launch of a freshly installed prefix.
-export WINEDLLOVERRIDES="odbc32,odbccp32,odbccu32,odbccr32,odbcbcp,msado15,msxml3,msxml4,msxml6=n,b;winemenubuilder.exe=d"
+# mscoree=d: Platypus is Visual FoxPro, not .NET. Without it, the first launch after Wine
+# is upgraded shows a modal "Wine could not find a wine-mono package ... Install?" box,
+# because the new wine.inf mtime makes Wine re-run its prefix update. Nothing here needs
+# Mono, so never ask. Gecko is deliberately left alone - some screens do want it.
+export WINEDLLOVERRIDES="odbc32,odbccp32,odbccu32,odbccr32,odbcbcp,msado15,msxml3,msxml4,msxml6=n,b;winemenubuilder.exe=d;mscoree=d"
 WINE="$WINE"
 APP_DIR="$APP_DIR"
 LOG="$LOG_DIR/platypus.log"
-mkdir -p "\$(dirname "\$LOG")"; : >"\$LOG"   # fresh log for this run
+mkdir -p "\$(dirname "\$LOG")"
+# Keep the previous runs instead of truncating. Wine writes its unhandled-exception
+# backtrace to stderr, which lands in this file - so truncating on every start destroyed the
+# evidence for the crash that just happened, the moment the user relaunched. Ten runs is
+# plenty and costs a few hundred KB.
+if [ -s "\$LOG" ]; then
+  mv -f "\$LOG" "\$LOG.\$(date +%Y%m%d-%H%M%S)" 2>/dev/null || true
+  ls -1t "\$LOG".* 2>/dev/null | tail -n +11 | while IFS= read -r old; do rm -f "\$old"; done
+fi
+: >"\$LOG"
 if [ ! -x "\$WINE" ]; then
   msg="Wine was not found at \$WINE. Re-run the wine-platypus installer."
   command -v zenity >/dev/null 2>&1 && zenity --error --text="\$msg" || echo "\$msg" >&2
@@ -850,13 +889,16 @@ rm -rf "\$LOCK"; mkdir -p "\$LOCK"; echo \$\$ >"\$LOCK/pid"
 "$WINESERVER" -k >/dev/null 2>&1 || true
 # Self-heal: a Wine upgrade restores the stock oleaut32 and loses our two fixes. It has to
 # go back in BOTH places - the Wine tree (what the loader actually maps, via \KnownDlls)
-# and the prefix copy. Only for the Wine 11.x the patch was built against.
+# and the prefix copy. Only for the EXACT Wine the patch was built from: a builtin taken
+# from a different 11.x loads without complaint and then misbehaves subtly, which is much
+# worse to debug than simply not applying it.
 PAYLOAD="$PLATYPUS_HOME/payload/oleaut32.dll"
 SYSDLL="$(prefix_sysdir)/oleaut32.dll"
 WINE_ROOT="$(cd "$WINE_BIN_DIR/.." && pwd)"
+OLEAUT32_BUILT_FROM="$PLATYPUS_OLEAUT32_WINE_VERSION"
 if [ -f "\$PAYLOAD" ]; then
   case "\$("\$WINE" --version 2>/dev/null)" in
-    wine-11.*)
+    "\$OLEAUT32_BUILT_FROM")
       find "\$WINE_ROOT" -type f -path '*i386-windows/oleaut32.dll' 2>/dev/null | while IFS= read -r t; do
         cmp -s "\$PAYLOAD" "\$t" && continue
         cp -f "\$PAYLOAD" "\$t.new" 2>/dev/null && mv -f "\$t.new" "\$t" 2>/dev/null \
@@ -866,7 +908,9 @@ if [ -f "\$PAYLOAD" ]; then
         cp -f "\$PAYLOAD" "\$SYSDLL.new" && mv -f "\$SYSDLL.new" "\$SYSDLL" \
           && echo "restored patched oleaut32 in the prefix after an update" >>"\$LOG"
       fi ;;
-    *) echo "WARNING: Wine is no longer 11.x; patched oleaut32 not applied (re-run the installer / see docs)" >>"\$LOG" ;;
+    *) echo "WARNING: Wine is not \$OLEAUT32_BUILT_FROM (the version the patched oleaut32 was built from);" >>"\$LOG"
+       echo "         it was NOT applied. Rebuild it - see docs/wine-patches.md - then re-run ./install.sh." >>"\$LOG"
+       echo "         Until then, e-mail rows cannot be selected and Delete Message fails with 0x8002000e." >>"\$LOG" ;;
   esac
 fi
 cd "\$APP_DIR" || exit 1

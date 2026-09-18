@@ -106,7 +106,9 @@ dir. A per-prefix `native` override is not used for this one: the rebuilt DLL ke
 it to **both** locations: the Wine install dir (so new prefixes and `wineboot -u` refreshes
 pick it up; a `.wine-platypus.orig` backup is kept and restored on uninstall) and the
 existing prefix's system directory (which is what an already-created prefix actually
-loads). Built from Wine 11.0 sources, so it installs only when the detected Wine is 11.x;
+loads). Built from Wine 11.14 sources, and the installer matches that version **exactly**
+rather than `wine-11.*`, because a builtin from a different 11.x loads without complaint and
+then misbehaves subtly;
 see `docs/wine-patches.md` to rebuild for another version. The patch is additive, so other
 Wine apps on the machine are unaffected.
 
@@ -146,7 +148,7 @@ which is the same on Windows.
 
 Platypus's error handler reads `Win32_ComputerSystem` and `Win32_OperatingSystem` through
 WMI (`GETOBJECT("winmgmts:")`) when it builds an error report.
-Wine implements this through `wbemdisp`/`wbemprox`; Wine 11.0 still lacks a few
+Wine implements this through `wbemdisp`/`wbemprox`; Wine 11.0 lacked a few
 `SWbemProperty`/`SWbemPropertySet` methods (`Properties_` enumeration, `Name`, `CIMType`)
 that were added to Wine in 2026. See the README's troubleshooting table for the status.
 
@@ -156,7 +158,7 @@ that were added to Wine in 2026. See the README's troubleshooting table for the 
 `bin/platypus` (Linux) and `Platypus Billing.app/Contents/MacOS/platypus` (macOS) are the
 same generated script. It takes a single-instance lock, stops a stale Wine server left by a
 previous session, self-heals the patched `oleaut32.dll` in the prefix if a Wine update
-re-created it (only while Wine is 11.x), then
+re-created it (only when Wine is exactly the version that DLL was built from), then
 **`exec`s** Wine so the launcher and Wine are one process: on macOS that means a single
 Dock tile with our name and icon (a spawned child would get its own tile next to the
 launcher's). Because nothing survives the `exec`, a small detached watcher waits for that
@@ -186,7 +188,7 @@ bundle `LSUIElement` so it never bounces.
 | `~/.local/share/applications/platypus-billing.desktop` | - |
 | `~/.local/share/icons/hicolor/*/apps/platypus-billing.png` | - |
 | `~/.local/share/platypus/config` (server, db, wine path/version/mode) | same, under Application Support |
-| `~/.local/share/platypus/wine` (pinned portable Wine 11.0, Linux default) | - (Homebrew cask) |
+| `~/.local/share/platypus/wine` (pinned portable Wine 11.14, Linux default) | - (Homebrew cask) |
 | `~/.local/share/platypus/payload/oleaut32.dll` (copy the launcher restores after Wine updates) | same |
 | `~/.local/share/platypus/run.lock` (single-instance lock while running) | same |
 

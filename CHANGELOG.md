@@ -1,5 +1,43 @@
 # Changelog
 
+## v2.2.0 - 2026-09-17
+
+Moves the pinned Wine to 11.14, which fixes the "black rectangle", and stops the launcher
+destroying crash evidence.
+
+**The black rectangle.** An opaque leftover window - sometimes solid black, sometimes an
+empty outline, sometimes a translucent ghost of stale text - floated over the app after one
+of its own windows closed. All three appearances are one mechanism: a window left mapped,
+still holding whatever was last drawn into it, never repainted. Confirmed gone after moving
+the pinned Wine 11.0 -> 11.14. The cause is almost certainly winehq
+[bug 59378](https://bugs.winehq.org/show_bug.cgi?id=59378) (a `winex11` race leaving a
+properly hidden window mapped; fix `2b05f63811f0` shipped in 11.13), though the jump spans
+11.1-11.14 so it is not a bisected certainty.
+
+Ruled out along the way, recorded so it is not re-investigated: it is **not** an MDI
+painting bug (MDI children are drawn into the frame's own window surface and are not X11
+windows at all - only one X11 toplevel exists with several forms open); **not**
+compositor-specific; **not** transparency or an ARGB visual (every Wine window uses a
+depth-24 visual); and **not** Wine Gecko. `tools/src/blackbox.c` is included but does *not*
+reproduce 59378 - read its header before drawing conclusions from it.
+
+**The launcher no longer truncates its log on every start.** Wine writes unhandled-exception
+backtraces to stderr, which land in `platypus.log` - and truncating erased the previous
+crash the moment the user relaunched. It now keeps the last ten runs as
+`platypus.log.YYYYmmdd-HHMMSS`.
+
+**The `oleaut32` version gate is now exact.** It matched `wine-11.*`, so it would have
+dropped an 11.0-built builtin into an 11.14 tree - a mismatch that loads without complaint
+and misbehaves subtly. It now matches `PLATYPUS_OLEAUT32_WINE_VERSION` exactly and skips the
+patch loudly otherwise. The vendored DLL is rebuilt from Wine 11.14 sources; neither fix is
+upstream yet (both defects are still present in 11.17), so the patch stays. The rebuild now
+needs only the 32-bit MinGW toolchain - `--enable-archs=i386` builds the one DLL required.
+
+**The installer and launcher now disable `mscoree`.** Bumping the pinned Wine changes
+`wine.inf`'s mtime, so `wineboot` re-runs its prefix update and Wine opens a modal "could
+not find a wine-mono package" dialog that blocks an unattended install. Platypus is Visual
+FoxPro, never .NET. Gecko is deliberately left alone.
+
 ## v2.1.0 - 2026-09-11
 
 Fixes the crash when opening an e-mail, and lets newer VB6/MFC runtimes be supplied.
