@@ -1,5 +1,45 @@
 # Changelog
 
+## v2.3.0 - 2026-09-19
+
+Pins Wine **11.17**, fixing a hang that wedged Platypus after a few hours.
+
+**The hang.** After hours of ordinary use the app stopped responding - window still on
+screen, sometimes frozen mid-paint, sometimes black - with one CPU core pinned at 100%
+indefinitely. It looked like a crash but was not: nothing appeared in `vfp9rerr.log` or
+Platypus' own error log, because nothing crashed. Measured: main thread in `state=R`, zero
+syscalls, zero page faults, instruction pointer parked in `win32u.so` at
+`get_shared_queue+0x2d`, identical across two separate occurrences.
+
+Cause: commit `08f7b746b00c` ("winex11: Send raw mouse motion frames from XI2 RawEvents"),
+new in **11.13**, overruns a 64-entry raw-mouse frame buffer and corrupts wineserver-side
+shared memory. The shared object's seqlock is left permanently odd, so
+`shared_object_acquire_seqlock()`'s `while ((seq = ReadNoFence64(&object->seq)) & 1)
+YieldProcessor();` never exits - a pure userspace spin. The tell just before it wedges is a
+burst of `err:msg:process_hardware_message unknown message type 1/2/3`, which are
+`WM_CREATE`/`WM_DESTROY`/`WM_MOVE` arriving on the hardware-message path.
+
+Fixed upstream by `a1bae27f21b5` ("win32u: Don't ignore raw mouse input"), first shipped in
+**11.15** - winehq [59986](https://bugs.winehq.org/show_bug.cgi?id=59986),
+[59998](https://bugs.winehq.org/show_bug.cgi?id=59998),
+[59999](https://bugs.winehq.org/show_bug.cgi?id=59999),
+[60005](https://bugs.winehq.org/show_bug.cgi?id=60005) and
+[60051](https://bugs.winehq.org/show_bug.cgi?id=60051), all CLOSED FIXED.
+
+**11.13 and 11.14 are the only affected releases**, and v2.2.0 pinned 11.14 - so this
+project shipped the bug for one release. Anyone on v2.2.x should upgrade.
+
+- Pin moves 11.14 -> **11.17** (Kron4ek's newest; carries this fix plus the 11.0 window
+  fixes v2.2.0 was after).
+- `oleaut32` rebuilt from 11.17 sources; the patch still applies cleanly and is still not
+  upstream (both defects remain in 11.17).
+- `docs/how-it-works.md` now documents both defects and how each was identified.
+
+A note on method, since it cost time: the first diagnosis of this hang compared
+`get_shared_queue` across 11.14, 11.17 and master, found it byte-identical, and concluded
+upgrading would not help. That was wrong - `get_shared_queue` is where the spin *shows up*,
+not where the bug *is*. The fix is one line in `dlls/win32u/input.c`, upstream of it.
+
 ## v2.2.1 - 2026-09-17
 
 Fixes the v2.2.0 upgrade path.

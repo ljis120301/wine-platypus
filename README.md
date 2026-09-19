@@ -18,7 +18,7 @@ Linux  : git clone --depth 1 https://github.com/<your-github-username>/wine-plat
 macOS  : git clone --depth 1 https://github.com/<your-github-username>/wine-platypus && cd wine-platypus && ./install-macos.sh
 ```
 
-Tested with Wine 11.14 against a production SQL Server (TDS 7.4), in 32‑bit and 64‑bit
+Tested with Wine 11.17 against a production SQL Server (TDS 7.4), in 32‑bit and 64‑bit
 (WoW64) prefixes, on Fedora 44 and macOS (Apple Silicon).
 
 ---
@@ -31,7 +31,7 @@ Tested with Wine 11.14 against a production SQL Server (TDS 7.4), in 32‑bit an
    Ask your Platypus administrator. The installer asks for host and database; the login is
    entered once in the app's own connection dialog on first launch.
 3. Internet access on first install: the Microsoft redistributables (~13 MB) and, on Linux,
-   a pinned portable Wine (~94 MB) are downloaded and checksum‑verified. For offline
+   a pinned portable Wine (~96 MB) are downloaded and checksum‑verified. For offline
    installs, drop the files into `vendor/` first (see `vendor/README.md`).
 
 | | Linux | macOS |
@@ -52,7 +52,7 @@ cp /path/to/Platypus7.Client.exe vendor/
 
 Steps, about 5 minutes:
 
-1. **Wine** – a pinned, checksummed portable Wine 11.14 is downloaded into the install folder
+1. **Wine** – a pinned, checksummed portable Wine 11.17 is downloaded into the install folder
    (`~/.local/share/platypus/wine`). Nothing system‑wide; your distro's Wine is untouched.
    `--system-wine` uses the distro package instead (WineHQ repo on Debian/Ubuntu, dnf, pacman).
 2. **Packages** – `cabextract` via your package manager (asks for your password once).
@@ -122,7 +122,8 @@ two looks; the Windows Vista/7 "Aero" style is not available.
 
 | Symptom | Cause / fix |
 |---|---|
-| A black rectangle (sometimes an empty outline, or a grey ghost of old text) floats over the app, usually after closing a window | A Wine defect, fixed by pinning Wine 11.14 (almost certainly winehq [bug 59378](https://bugs.winehq.org/show_bug.cgi?id=59378) - a window the app hid properly is left mapped, still holding its last contents). Run `./install.sh` to move onto the pinned Wine. Not a display, theme or window-manager problem, so changing those will not help. |
+| A black rectangle (sometimes an empty outline, or a grey ghost of old text) floats over the app, usually after closing a window | A Wine defect present in 11.0, fixed by the pinned Wine (almost certainly winehq [bug 59378](https://bugs.winehq.org/show_bug.cgi?id=59378) - a window the app hid properly is left mapped, still holding its last contents). Run `./install.sh`. Not a display, theme or window-manager problem, so changing those will not help. |
+| Platypus stops responding after a few hours - window still there but frozen or black, and one CPU core pinned at 100% | A Wine defect in **11.13 and 11.14 only** ([59986](https://bugs.winehq.org/show_bug.cgi?id=59986), [59998](https://bugs.winehq.org/show_bug.cgi?id=59998), [59999](https://bugs.winehq.org/show_bug.cgi?id=59999), [60005](https://bugs.winehq.org/show_bug.cgi?id=60005), [60051](https://bugs.winehq.org/show_bug.cgi?id=60051)): a raw-mouse buffer overrun corrupts Wine's shared memory, and win32u then spins forever on a seqlock that never settles. Fixed upstream in 11.15; this project pins 11.17. Run `./install.sh`, then `./install.sh --verify` to confirm the version. |
 | `Login failed for user '...'` on Test | SQL password wrong; driver and network are fine. |
 | `SQL Server does not exist or access denied` | Host/IP wrong or port 1433 blocked (VPN?). `./install.sh --server <host>`. |
 | `Driver is probably out of resources` | Microsoft ODBC driver missing: re‑run the installer. |
@@ -136,7 +137,7 @@ Every one of these has a section in [docs/how-it-works.md](docs/how-it-works.md)
 
 ## 8. Which Wine, upgrades, and what is modified
 
-Linux pins a portable Wine 11.14 inside the install folder, so package upgrades cannot change
+Linux pins a portable Wine 11.17 inside the install folder, so package upgrades cannot change
 what Platypus runs on. Native Microsoft components survive Wine upgrades; the one Wine builtin
 we replace (`oleaut32.dll`) is restored by the launcher after a Wine update while Wine is 11.x.
 Only `~/.local/share/platypus`, `~/.local/bin/platypus` and the menu entry/icon are created

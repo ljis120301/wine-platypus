@@ -1,6 +1,6 @@
 # Rebuilding the patched oleaut32.dll
 
-`vendor/wine-patches/oleaut32-wine11.14-i386-builtin.dll` is Wine 11.14's 32-bit builtin
+`vendor/wine-patches/oleaut32-wine11.17-i386-builtin.dll` is Wine 11.17's 32-bit builtin
 `oleaut32.dll` rebuilt with `0001-oleaut32-object-arg-and-default-property-put.patch`
 (two fixes: NULL-for-object-parameter, and default-property write-through for an indexed
 get-only property). It keeps the "Wine builtin DLL" marker and is dropped into the Wine
@@ -22,13 +22,13 @@ without root (the same steps work on Ubuntu with `apt install gcc-mingw-w64 flex
 sudo dnf install mingw32-gcc mingw32-headers mingw32-crt flex bison gcc make
 
 # 2. Wine source, patched
-curl -LO https://dl.winehq.org/wine/source/11.x/wine-11.14.tar.xz
-tar xf wine-11.14.tar.xz && cd wine-11.14
+curl -LO https://dl.winehq.org/wine/source/11.x/wine-11.17.tar.xz
+tar xf wine-11.17.tar.xz && cd wine-11.17
 patch -p1 < /path/to/wine-platypus/vendor/wine-patches/0001-oleaut32-object-arg-and-default-property-put.patch
 
 # 3. Configure a PE-only cross build (no X11/audio/etc. needed for one DLL)
 mkdir ../build && cd ../build
-../wine-11.14/configure --enable-archs=i386 --disable-tests \
+../wine-11.17/configure --enable-archs=i386 --disable-tests \
    --without-x --without-freetype --without-fontconfig --without-gnutls --without-gstreamer \
    --without-alsa --without-pulse --without-opengl --without-vulkan --without-wayland \
    --without-dbus --without-cups --without-krb5 --without-sdl --without-udev --without-usb \
@@ -40,8 +40,8 @@ make -j"$(nproc)" dlls/oleaut32/i386-windows/oleaut32.dll      # ~2 minutes
 
 # 4. Strip (keep the builtin marker; it replaces the stock builtin in place)
 i686-w64-mingw32-strip --strip-unneeded dlls/oleaut32/i386-windows/oleaut32.dll
-cp dlls/oleaut32/i386-windows/oleaut32.dll /path/to/wine-platypus/vendor/wine-patches/oleaut32-wine11.14-i386-builtin.dll
-cd /path/to/wine-platypus/vendor && sha256sum wine-patches/oleaut32-wine11.14-i386-builtin.dll tools/comcheck.exe tools/fixprogids.exe tools/ico2png.exe tools/comcheck-list.txt > SHA256SUMS
+cp dlls/oleaut32/i386-windows/oleaut32.dll /path/to/wine-platypus/vendor/wine-patches/oleaut32-wine11.17-i386-builtin.dll
+cd /path/to/wine-platypus/vendor && sha256sum wine-patches/oleaut32-wine11.17-i386-builtin.dll tools/comcheck.exe tools/fixprogids.exe tools/ico2png.exe tools/comcheck-list.txt > SHA256SUMS
 ```
 
 Where it goes: `oleaut32` is a `\KnownDlls` section, and the loader builds it from the

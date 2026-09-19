@@ -29,7 +29,7 @@ PLATYPUS_INSTALLER="$VENDOR_DIR/Platypus7.Client.exe"
 MDAC_PACKAGE="$VENDOR_DIR/MDAC_TYP.EXE"
 VC6_PACKAGE="$VENDOR_DIR/VC6RedistSetup_deu.exe"
 VB6_PACKAGE="$VENDOR_DIR/VB6.0-KB290887-X86.exe"
-OLEAUT32_PATCHED="$VENDOR_DIR/wine-patches/oleaut32-wine11.14-i386-builtin.dll"
+OLEAUT32_PATCHED="$VENDOR_DIR/wine-patches/oleaut32-wine11.17-i386-builtin.dll"
 TOOLS_DIR="$VENDOR_DIR/tools"
 MSXML3_PACKAGE="$VENDOR_DIR/msxml3.msi"
 MSXML4_PACKAGE="$VENDOR_DIR/msxml.msi"
@@ -46,24 +46,41 @@ MSXML6_PACKAGE="$VENDOR_DIR/msxml6-KB2957482-enu-amd64.exe"
 # Pinned portable Wine for Linux (vanilla WineHQ sources, Kron4ek build, WoW64 flavour:
 # runs 32-bit apps without any 32-bit host libraries). Changing Wine = re-validate + bump here.
 #
-# Why 11.14 and not 11.0: Wine 11.0 shows a "black rectangle" - an opaque leftover window
-# floating over the app after one of its own windows closes, holding whatever was last drawn
-# into it. Confirmed fixed by this upgrade. The cause is almost certainly winehq bug 59378
-# (a winex11 race leaving a properly hidden window mapped; fix 2b05f63811f0, "winex11: Use
-# the desired state for mapping delays", shipped in 11.13), though the jump spans 11.1-11.14
-# so it is not a bisected certainty. 11.14 also carries MDI window fixes and #30824, an
-# msvbvm60 crash in the same runtime v2.1.0 works around. 11.15+ keep reworking window
-# state, so stop at 11.14.
-: "${PLATYPUS_WINE_PIN_VERSION:=wine-11.14}"
-: "${PLATYPUS_WINE_PIN_URL:=https://github.com/Kron4ek/Wine-Builds/releases/download/11.14/wine-11.14-amd64-wow64.tar.xz}"
-: "${PLATYPUS_WINE_PIN_SHA256:=707956fa1574ad1660c4d7f2cfd9c024e0f437ad0a2d501a53b717adb1288222}"
+# Two Wine defects drove this pin, both hit in production:
+#
+# 1. The "black rectangle" (Wine 11.0). An opaque leftover window floated over the app
+#    after one of its own windows closed, still holding whatever was last drawn into it.
+#    Almost certainly winehq bug 59378 - a winex11 race leaving a properly hidden window
+#    mapped; fix 2b05f63811f0, shipped in 11.13. Confirmed gone after moving off 11.0.
+#    Also established: it was a real X11 toplevel, NOT an MDI child (those are painted
+#    into the frame's own surface and are not X11 windows at all), not
+#    compositor-specific, and not a transparency/ARGB problem (every window is depth 24).
+#
+# 2. The 100% CPU hang (Wine 11.13 and 11.14 ONLY). After hours of ordinary use the main
+#    thread pegged one core indefinitely inside win32u's get_shared_queue - no syscalls,
+#    no page faults, window still mapped but never repainting again. Cause: commit
+#    08f7b746b00c ("winex11: Send raw mouse motion frames from XI2 RawEvents", new in
+#    11.13) overruns a 64-entry raw-mouse buffer and corrupts wineserver-side shared
+#    memory; the shared object's seqlock is then left permanently odd, and
+#    shared_object_acquire_seqlock()'s "while (seq & 1) YieldProcessor()" never exits.
+#    The tell on the way in is a burst of "process_hardware_message unknown message
+#    type 1/2/3" (those are WM_CREATE/WM_DESTROY/WM_MOVE reaching the hardware path).
+#    Fixed by a1bae27f21b5 ("win32u: Don't ignore raw mouse input"), first shipped in
+#    11.15 - winehq 59986 / 59998 / 59999 / 60005 / 60051, all CLOSED FIXED.
+#
+# 11.13 and 11.14 are the only releases carrying defect 2, and this project shipped 11.14
+# briefly (v2.2.0-v2.2.1). 11.17 is Kron4ek's newest build and carries both fixes.
+# Do not treat tools/src/blackbox.c as proof of anything - read its header comment.
+: "${PLATYPUS_WINE_PIN_VERSION:=wine-11.17}"
+: "${PLATYPUS_WINE_PIN_URL:=https://github.com/Kron4ek/Wine-Builds/releases/download/11.17/wine-11.17-amd64-wow64.tar.xz}"
+: "${PLATYPUS_WINE_PIN_SHA256:=3211db09086bc6fbd769c0286f27790b32d6fc6fb0bc610dad6b59796f07d462}"
 : "${PLATYPUS_WINE_TARBALL:=}"    # optional: local copy of the tarball (offline installs / tests)
 # Which Wine the vendored oleaut32.dll was built from. Neither of its two fixes is upstream
 # (both defects are still present in Wine 11.17), so it must be rebuilt whenever the pin
 # moves - see docs/wine-patches.md. Matched exactly rather than as "wine-11.*": dropping a
 # builtin from one 11.x into another's tree loads without complaint and then misbehaves
 # subtly, so the installer would rather skip the patch loudly than guess.
-: "${PLATYPUS_OLEAUT32_WINE_VERSION:=wine-11.14}"
+: "${PLATYPUS_OLEAUT32_WINE_VERSION:=wine-11.17}"
 
 # ---- output helpers --------------------------------------------------------
 if [ -t 1 ]; then
@@ -262,7 +279,7 @@ check_vendor_files() {
 
 # ---- wine discovery --------------------------------------------------------
 # ---- 0. pinned portable Wine (Linux default) ---------------------------------------------
-# Puts a checksummed Wine 11.14 into $PLATYPUS_HOME/wine so the install does not depend on -
+# Puts a checksummed Wine 11.17 into $PLATYPUS_HOME/wine so the install does not depend on -
 # and cannot be broken by - the distro's Wine package or its upgrades. Re-used if already
 # present with the pinned version. Needs curl or wget, tar, xz.
 ensure_portable_wine() {
@@ -289,7 +306,7 @@ ensure_portable_wine() {
     fi
   fi
   if [ ! -f "$tb" ]; then
-    say "Downloading pinned Wine ($PLATYPUS_WINE_PIN_VERSION, ~94 MB)"
+    say "Downloading pinned Wine ($PLATYPUS_WINE_PIN_VERSION, ~96 MB)"
     if need_cmd curl; then curl -fL --progress-bar -o "$tb.part" "$PLATYPUS_WINE_PIN_URL" || { rm -f "$tb.part"; die "$dl_fail"; }
     elif need_cmd wget; then wget -q --show-progress -O "$tb.part" "$PLATYPUS_WINE_PIN_URL" || { rm -f "$tb.part"; die "$dl_fail"; }
     else die "Need curl or wget to download Wine (or set PLATYPUS_WINE_TARBALL to a local copy)"; fi
@@ -343,7 +360,25 @@ find_wine() {
   WINE_BIN_DIR="$(cd "$(dirname "$real")" && pwd)"
   WINESERVER="$WINE_BIN_DIR/wineserver"
   [ -x "$WINESERVER" ] || WINESERVER="$(command -v wineserver 2>/dev/null || true)"
-  WINE_VERSION="$("$WINE" --version 2>/dev/null || echo unknown)"
+  # A Wine that cannot even report its version cannot run anything else either, and the
+  # next thing the user sees is a baffling "wineboot failed" several steps later. Stop here,
+  # where the cause is still obvious. PLATYPUS_SKIP_WINE_CHECK=1 escapes it for an unusual
+  # but working setup.
+  if ! WINE_VERSION="$("$WINE" --version 2>/dev/null)" || [ -z "$WINE_VERSION" ]; then
+    WINE_VERSION=unknown
+    if [ "${PLATYPUS_SKIP_WINE_CHECK:-0}" != "1" ]; then
+      warn "'$WINE --version' failed, so that Wine cannot run - nothing after this would work."
+      if [ "$(uname -s)" = "Darwin" ]; then
+        warn "On macOS this is almost always one of:"
+        warn "  Rosetta 2 missing (Apple Silicon):  softwareupdate --install-rosetta"
+        warn "  Gatekeeper quarantine:              xattr -dr com.apple.quarantine \"/Applications/Wine Stable.app\""
+        warn "  a broken or half-installed cask:    brew reinstall --cask --no-quarantine wine-stable"
+      else
+        warn "Try running it directly to see why:  \"$WINE\" --version"
+      fi
+      die "Wine at $WINE does not run. Fix it, or pass --wine /path/to/a/working/wine (PLATYPUS_SKIP_WINE_CHECK=1 overrides)."
+    fi
+  fi
   ok "Using $WINE ($WINE_VERSION)"
 }
 
@@ -644,7 +679,7 @@ REG
 #     returned object's default member (repopulating subitems: ListSubItems(n) = text)
 #     -> deleting a message raises "OLE error 0x8002000e".
 # Windows' oleaut32 handles both. vendor/wine-patches/ holds a source patch against
-# Wine 11.14 plus the rebuilt 32-bit builtin oleaut32.dll.
+# Wine 11.17 plus the rebuilt 32-bit builtin oleaut32.dll.
 #
 # Delivery: oleaut32 is loaded during Wine's own start-up, before a prefix's DLL
 # overrides are consulted, so a per-prefix "native" override cannot win for it. It is also
@@ -863,7 +898,14 @@ export WINEPREFIX="$PREFIX"
 if [ "\${PLATYPUS_DEBUG:-0}" = "1" ]; then
   export WINEDEBUG="\${WINEDEBUG:--hid,+typelib,+wbemdisp,+wbemprox}"
 else
-  export WINEDEBUG="\${WINEDEBUG:-fixme-all,err-hid}"   # err-hid: silence harmless input-device chatter
+  # err-hid: harmless input-device chatter.
+  # err-msg: win32u's process_hardware_message logs ERR "unknown message type %x" for every
+  # WM_CREATE/WM_DESTROY/WM_MOVE that reaches the hardware-message path. Platypus drives a
+  # steady ~50/s of those from a timer-refreshed list, which filled a 75 MB log in one
+  # session. Verified lossless: across that whole log the msg channel carried nothing else
+  # (every other error was rebar, wbemdisp/OLE, wineboot or clipboard - 24 lines in total).
+  # This silences the noise; it does NOT stop the underlying churn.
+  export WINEDEBUG="\${WINEDEBUG:-fixme-all,err-hid,err-msg}"
 fi
 # ODBC overrides are ALSO set in the registry; the env form is needed because Wine
 # ignores registry DLL overrides on the very first launch of a freshly installed prefix.
@@ -879,10 +921,17 @@ mkdir -p "\$(dirname "\$LOG")"
 # Keep the previous runs instead of truncating. Wine writes its unhandled-exception
 # backtrace to stderr, which lands in this file - so truncating on every start destroyed the
 # evidence for the crash that just happened, the moment the user relaunched. Ten runs is
-# plenty and costs a few hundred KB.
+# plenty and the set is capped at ~100 MB,
+# since a single session can emit tens of MB if Wine hits a message storm.
 if [ -s "\$LOG" ]; then
   mv -f "\$LOG" "\$LOG.\$(date +%Y%m%d-%H%M%S)" 2>/dev/null || true
   ls -1t "\$LOG".* 2>/dev/null | tail -n +11 | while IFS= read -r old; do rm -f "\$old"; done
+  # Cap total size as well as count: one bad session can emit tens of MB (a Wine message
+  # storm), and ten of those would be hundreds. Drop the oldest until the set fits ~100 MB.
+  ls -1t "\$LOG".* 2>/dev/null | { total=0; while IFS= read -r f; do
+      total=\$(( total + \$(wc -c <"\$f" 2>/dev/null || echo 0) ))
+      [ "\$total" -gt 104857600 ] && rm -f "\$f"
+    done; }
 fi
 : >"\$LOG"
 if [ ! -x "\$WINE" ]; then

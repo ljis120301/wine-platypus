@@ -24,5 +24,5 @@ installer drop its patched `oleaut32.dll` and (partly) the native MSXML.
 
 How to submit: Wine takes merge requests on https://gitlab.winehq.org/wine/wine (see
 https://wiki.winehq.org/Submitting_Patches). Each item above should become its own MR
-with a test in `dlls/<dll>/tests/`. The patch here is against `wine-11.14` (it also applies
-cleanly to 11.17, where both defects are still present - neither fix has been upstreamed).
+with a test in `dlls/<dll>/tests/`. The patch here is against `wine-11.17`, where both defects are still
+present - neither fix has been upstreamed.

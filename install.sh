@@ -170,7 +170,7 @@ require_sql_settings
 # otherwise, e.g. under --yes or a piped/CI run).
 if [ "$WINE_MODE_SET" = "0" ]; then
   menu WINE_CHOICE "How should Platypus run Wine?" \
-    "Pinned portable Wine - recommended (a known-good build, isolated from the rest of the system, ~94 MB download)" \
+    "Pinned portable Wine - recommended (a known-good build, isolated from the rest of the system, ~96 MB download)" \
     "This system's installed Wine package"
   [ "$WINE_CHOICE" = "2" ] && WINE_MODE=system
 fi

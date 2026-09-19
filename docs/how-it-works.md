@@ -106,11 +106,63 @@ dir. A per-prefix `native` override is not used for this one: the rebuilt DLL ke
 it to **both** locations: the Wine install dir (so new prefixes and `wineboot -u` refreshes
 pick it up; a `.wine-platypus.orig` backup is kept and restored on uninstall) and the
 existing prefix's system directory (which is what an already-created prefix actually
-loads). Built from Wine 11.14 sources, and the installer matches that version **exactly**
+loads). Built from Wine 11.17 sources, and the installer matches that version **exactly**
 rather than `wine-11.*`, because a builtin from a different 11.x loads without complaint and
 then misbehaves subtly;
 see `docs/wine-patches.md` to rebuild for another version. The patch is additive, so other
 Wine apps on the machine are unaffected.
+
+## Two Wine defects this project has had to pin around
+
+### 1. The black rectangle (Wine 11.0)
+
+A rectangle - sometimes solid black, sometimes an empty outline, sometimes a translucent
+ghost of stale text - appeared over the app, typically after a form closed. All three
+appearances are one mechanism: a window left mapped, still holding whatever was last drawn
+into it, never repainted. Confirmed gone after moving off 11.0.
+
+Almost certainly winehq [bug 59378](https://bugs.winehq.org/show_bug.cgi?id=59378), a
+`winex11` race in which a window the app *did* hide properly is left mapped; the fix
+(`2b05f63811f0`) shipped in Wine 11.13.
+
+What was ruled out, because the symptom misleads in three ways:
+
+* **It looks like an MDI painting bug, and is not.** MDI children are drawn into the
+  frame's own window surface and are not X11 windows at all, so they cannot be separately
+  mapped or left behind. The stuck window is a real toplevel - which is why a compositor
+  draws its rounding and shadow on it, making it look like a window the app never asked for.
+* **It looks compositor-specific, and is not.** It reproduces on any X11/XWayland setup.
+* **It looks like a transparency problem, and is not.** Every Wine window here uses a
+  depth-24 visual; no ARGB is involved.
+
+Do not read `tools/src/blackbox.c` as proof either way - see its header comment.
+
+### 2. The 100% CPU hang (Wine 11.13 and 11.14 only)
+
+After hours of ordinary use Platypus would stop responding: window still mapped, sometimes
+frozen mid-paint and sometimes black, with **one core pinned at 100% indefinitely**.
+Measured: main thread in `state=R`, zero syscalls, zero page faults, instruction pointer
+parked in `win32u.so` at `get_shared_queue+0x2d`. Nothing crashed, so nothing appeared in
+`vfp9rerr.log` or Platypus' own error log - which is why it looked like a crash but was not.
+
+Cause: commit `08f7b746b00c` ("winex11: Send raw mouse motion frames from XI2 RawEvents"),
+new in **11.13**, overruns a 64-entry raw-mouse frame buffer and corrupts wineserver-side
+shared memory. The shared object's seqlock is then left permanently odd, so the reader in
+`shared_object_acquire_seqlock()`:
+
+```c
+while ((*seq = ReadNoFence64( &object->seq )) & 1) YieldProcessor();
+```
+
+never exits - a pure userspace spin, exactly matching the measurements. The tell on the way
+in is a burst of `err:msg:process_hardware_message unknown message type 1/2/3` - those are
+`WM_CREATE`/`WM_DESTROY`/`WM_MOVE` arriving on the hardware-message path, which should never
+happen and is the corruption surfacing.
+
+Fixed upstream by `a1bae27f21b5` ("win32u: Don't ignore raw mouse input"), first shipped in
+**11.15** - winehq 59986, 59998, 59999, 60005 and 60051, all CLOSED FIXED. **11.13 and 11.14
+are the only affected releases**, and this project shipped 11.14 in v2.2.0-v2.2.1, which is
+how it was hit. The pin is now 11.17.
 
 ## COM registration repairs and the self-check
 
@@ -188,7 +240,7 @@ bundle `LSUIElement` so it never bounces.
 | `~/.local/share/applications/platypus-billing.desktop` | - |
 | `~/.local/share/icons/hicolor/*/apps/platypus-billing.png` | - |
 | `~/.local/share/platypus/config` (server, db, wine path/version/mode) | same, under Application Support |
-| `~/.local/share/platypus/wine` (pinned portable Wine 11.14, Linux default) | - (Homebrew cask) |
+| `~/.local/share/platypus/wine` (pinned portable Wine 11.17, Linux default) | - (Homebrew cask) |
 | `~/.local/share/platypus/payload/oleaut32.dll` (copy the launcher restores after Wine updates) | same |
 | `~/.local/share/platypus/run.lock` (single-instance lock while running) | same |
 
